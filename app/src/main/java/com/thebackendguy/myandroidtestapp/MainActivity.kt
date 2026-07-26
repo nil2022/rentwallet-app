@@ -39,7 +39,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -49,6 +48,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.thebackendguy.myandroidtestapp.ui.landing.LandingRole
+import com.thebackendguy.myandroidtestapp.ui.landing.LandingScreen
 import com.thebackendguy.myandroidtestapp.ui.theme.MyAndroidTestAppTheme
 
 private enum class AppScreen {
@@ -326,9 +327,12 @@ private fun RentWalletApp() {
         color = Color(0xFFF7F8FA)
     ) {
         when (currentScreen) {
-            AppScreen.Welcome -> WelcomeScreen(
-                onRoleSelected = { role ->
-                    selectedRole = role
+            AppScreen.Welcome -> LandingScreen(
+                onRoleSelected = { landingRole ->
+                    selectedRole = when (landingRole) {
+                        LandingRole.Tenant -> UserRole.Tenant
+                        LandingRole.Landlord -> UserRole.Landlord
+                    }
                     currentScreen = AppScreen.Login
                 }
             )
@@ -412,57 +416,7 @@ private fun RentWalletApp() {
     }
 }
 
-@Composable
-private fun WelcomeScreen(
-    onRoleSelected: (UserRole) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .background(Color(0xFFF7F8FA))
-            .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column {
-            AppBrandHeader()
 
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Text(
-                text = "Rent payments made clear",
-                color = Color(0xFF101828),
-                fontSize = 36.sp,
-                lineHeight = 42.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = "A simple rental wallet app for tenants and landlords.",
-                color = Color(0xFF475467),
-                fontSize = 17.sp,
-                lineHeight = 25.sp
-            )
-
-            Spacer(modifier = Modifier.height(34.dp))
-
-            RoleCard(
-                role = UserRole.Tenant,
-                onClick = { onRoleSelected(UserRole.Tenant) }
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-            RoleCard(
-                role = UserRole.Landlord,
-                onClick = { onRoleSelected(UserRole.Landlord) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-        TrustStrip()
-    }
-}
 
 @Composable
 private fun LoginScreen(
@@ -3073,147 +3027,6 @@ private fun LandlordPlaceholderScreen(
 }
 
 
-@Composable
-private fun AppBrandHeader() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFF0F766E), Color(0xFFB7791F))
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "R",
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column {
-            Text(
-                text = "RentWallet",
-                color = Color(0xFF101828),
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Tenant and landlord payments",
-                color = Color(0xFF667085),
-                fontSize = 13.sp
-            )
-        }
-    }
-}
-
-
-@Composable
-private fun RoleCard(
-    role: UserRole,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = role.accent.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(8.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = role.title.first().toString(),
-                    color = role.accent,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = role.title,
-                    color = Color(0xFF101828),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = role.description,
-                    color = Color(0xFF667085),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun TrustStrip() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(8.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TrustItem(label = "Rent", value = "Due")
-        TrustItem(label = "Wallet", value = "Ready")
-        TrustItem(label = "Receipts", value = "Saved")
-    }
-}
-
-
-@Composable
-private fun TrustItem(
-    label: String,
-    value: String
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            color = Color(0xFF101828),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = label,
-            color = Color(0xFF667085),
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center
-        )
-    }
-}
 
 
 @Composable
