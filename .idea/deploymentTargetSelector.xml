@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="rent-wallet">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-07-27T13:57:47.671726300Z">
+        <DropdownSelection timestamp="2026-07-27T14:38:12.671824400Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=RZCXA1PE77L" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Nilanjan-PC\.android\avd\Medium_Phone.avd" />
             </handle>
           </Target>
         </DropdownSelection>

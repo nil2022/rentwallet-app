@@ -89,20 +89,13 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun MyAndroidTestAppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
-    val rentWalletColors = if (darkTheme) DarkRentWalletColors else LightRentWalletColors
+    // For MVP, RentWallet is locked to Light Theme
+    val colorScheme = LightColorScheme
+    val rentWalletColors = LightRentWalletColors
     val rentWalletTypography = LightRentWalletTypography
 
     CompositionLocalProvider(

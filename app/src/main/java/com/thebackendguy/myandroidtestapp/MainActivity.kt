@@ -1,6 +1,27 @@
 package com.thebackendguy.myandroidtestapp
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.VisualTransformation
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -50,6 +71,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.thebackendguy.myandroidtestapp.ui.landing.LandingRole
 import com.thebackendguy.myandroidtestapp.ui.landing.LandingScreen
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
+import com.thebackendguy.myandroidtestapp.ui.theme.rentWalletColors
 import com.thebackendguy.myandroidtestapp.ui.theme.MyAndroidTestAppTheme
 
 private enum class AppScreen {
@@ -271,27 +295,46 @@ private val landlordTenantAlerts = listOf(
 
 private enum class UserRole(
     val title: String,
-    val description: String,
-    val accent: Color
+    val description: String
 ) {
     Tenant(
         title = "Tenant",
-        description = "View rent due, pay securely, and keep receipts in one place.",
-        accent = Color(0xFF0F766E)
+        description = "View rent due, pay securely, and keep receipts in one place."
     ),
     Landlord(
         title = "Landlord",
-        description = "Track rent collections, wallet balance, and tenant status.",
-        accent = Color(0xFFB7791F)
+        description = "Track rent collections, wallet balance, and tenant status."
     )
 }
+
+private val UserRole.accent: Color
+    @Composable get() = when (this) {
+        UserRole.Tenant -> MaterialTheme.rentWalletColors.tenantPrimary
+        UserRole.Landlord -> MaterialTheme.rentWalletColors.landlordPrimary
+    }
+
+private val UserRole.onAccent: Color
+    @Composable get() = when (this) {
+        UserRole.Tenant -> MaterialTheme.rentWalletColors.tenantOnPrimary
+        UserRole.Landlord -> MaterialTheme.rentWalletColors.landlordOnPrimary
+    }
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                scrim = android.graphics.Color.TRANSPARENT,
+                darkScrim = android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                scrim = android.graphics.Color.TRANSPARENT,
+                darkScrim = android.graphics.Color.TRANSPARENT
+            )
+        )
         setContent {
-            MyAndroidTestAppTheme(dynamicColor = false) {
+            MyAndroidTestAppTheme(darkTheme = false, dynamicColor = false) {
                 RentWalletApp()
             }
         }
@@ -324,7 +367,7 @@ private fun RentWalletApp() {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF7F8FA)
+        color = MaterialTheme.colorScheme.background
     ) {
         when (currentScreen) {
             AppScreen.Welcome -> LandingScreen(
@@ -424,108 +467,512 @@ private fun LoginScreen(
     onBack: () -> Unit,
     onContinue: () -> Unit
 ) {
+    when (role) {
+        UserRole.Tenant -> TenantLoginScreen(onBack = onBack, onContinue = onContinue)
+        UserRole.Landlord -> LandlordLoginScreen(onBack = onBack, onContinue = onContinue)
+    }
+}
+
+@Composable
+private fun TenantLoginScreen(
+    onBack: () -> Unit,
+    onContinue: () -> Unit
+) {
     var mobileNumber by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .background(Color(0xFFF7F8FA))
+            .pointerInput(Unit) {
+                detectTapGestures { focusManager.clearFocus() }
+            }
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 28.dp)
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
         OutlinedButton(
             onClick = onBack,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFF344054)
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         ) {
             Text(text = "Back")
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        LoginHero(role = role)
-
-        Spacer(modifier = Modifier.height(28.dp))
-
+        // Hero Card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSystemInDarkTheme()) {
+                    MaterialTheme.colorScheme.surfaceContainer
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                }
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.size(76.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "Tenant",
+                            modifier = Modifier.size(38.dp),
+                            tint = MaterialTheme.rentWalletColors.tenantPrimary
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Form Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp)
+                modifier = Modifier.padding(24.dp)
             ) {
                 Text(
-                    text = "${role.title} Login",
-                    color = Color(0xFF101828),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "Tenant Login",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Sign in to continue.",
-                    color = Color(0xFF667085),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 OutlinedTextField(
                     value = mobileNumber,
                     onValueChange = { mobileNumber = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Mobile number") },
+                    label = { Text("Mobile Number") },
+                    placeholder = {
+                        Text(
+                            text = "Enter mobile number",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Phone,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    shape = RoundedCornerShape(16.dp),
                     singleLine = true,
-                    colors = loginTextFieldColors(role.accent),
+                    colors = loginTextFieldColors(MaterialTheme.rentWalletColors.tenantPrimary),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Phone,
                         imeAction = ImeAction.Next
                     )
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Password") },
+                    placeholder = {
+                        Text(
+                            text = "Enter password",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) {
+                                    Icons.Outlined.Visibility
+                                } else {
+                                    Icons.Outlined.VisibilityOff
+                                },
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
                     singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    colors = loginTextFieldColors(role.accent),
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = loginTextFieldColors(MaterialTheme.rentWalletColors.tenantPrimary),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done
                     )
                 )
 
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
                     onClick = onContinue,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(8.dp),
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = role.accent,
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.rentWalletColors.tenantPrimary,
+                        contentColor = MaterialTheme.rentWalletColors.tenantOnPrimary
                     )
                 ) {
-                    Text(
-                        text = "Continue",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Continue",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TextButton(onClick = { /* Non-functional link */ }) {
+                        Text(
+                            text = "Forgot Password?",
+                            color = MaterialTheme.rentWalletColors.tenantPrimary,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Secure Footer
+        SecureLoginFooter()
+    }
+}
+
+@Composable
+private fun LandlordLoginScreen(
+    onBack: () -> Unit,
+    onContinue: () -> Unit
+) {
+    var mobileNumber by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures { focusManager.clearFocus() }
+            }
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 20.dp)
+    ) {
+        OutlinedButton(
+            onClick = onBack,
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        ) {
+            Text(text = "Back")
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Landlord Hero Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSystemInDarkTheme()) {
+                    MaterialTheme.colorScheme.surfaceContainer
+                } else {
+                    MaterialTheme.colorScheme.secondaryContainer
+                }
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp, horizontal = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.size(76.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Home,
+                            contentDescription = "Landlord",
+                            modifier = Modifier.size(38.dp),
+                            tint = MaterialTheme.rentWalletColors.landlordPrimary
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Form Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Text(
+                    text = "Landlord Login",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Sign in to continue.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = mobileNumber,
+                    onValueChange = { mobileNumber = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Mobile Number") },
+                    placeholder = {
+                        Text(
+                            text = "Enter mobile number",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Phone,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    colors = loginTextFieldColors(MaterialTheme.rentWalletColors.landlordPrimary),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Next
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Password") },
+                    placeholder = {
+                        Text(
+                            text = "Enter password",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) {
+                                    Icons.Outlined.Visibility
+                                } else {
+                                    Icons.Outlined.VisibilityOff
+                                },
+                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    colors = loginTextFieldColors(MaterialTheme.rentWalletColors.landlordPrimary),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.rentWalletColors.landlordPrimary,
+                        contentColor = MaterialTheme.rentWalletColors.landlordOnPrimary
+                    )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Continue",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TextButton(onClick = { /* Non-functional link */ }) {
+                        Text(
+                            text = "Forgot Password?",
+                            color = MaterialTheme.rentWalletColors.landlordPrimary,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Secure Footer
+        SecureLoginFooter()
+    }
+}
+
+@Composable
+private fun SecureLoginFooter(
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(0.8f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Icon(
+                imageVector = Icons.Outlined.Shield,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Secure Login  ·  Privacy Protected",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "© RentWallet",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+        )
     }
 }
 
@@ -539,7 +986,7 @@ private fun TenantDashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -565,7 +1012,7 @@ private fun TenantDashboardScreen(
             AlertsSection(
                 title = "Alerts",
                 alerts = tenantDashboardAlerts,
-                accent = Color(0xFF0F766E)
+                accent = MaterialTheme.rentWalletColors.tenantPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -599,7 +1046,7 @@ private fun PayRentScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .padding(horizontal = 20.dp, vertical = 24.dp)
@@ -608,7 +1055,7 @@ private fun PayRentScreen(
             onClick = onBack,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFF344054)
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         ) {
             Text(text = "Back")
@@ -618,14 +1065,14 @@ private fun PayRentScreen(
 
         Text(
             text = "Pay Rent",
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "Review the rent details before confirming payment.",
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 15.sp,
             lineHeight = 22.sp
         )
@@ -635,7 +1082,7 @@ private fun PayRentScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -650,21 +1097,21 @@ private fun PayRentScreen(
                     ) {
                         Text(
                             text = "Rent amount",
-                            color = Color(0xFF667085),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Rs. 18,500",
-                            color = Color(0xFF101828),
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 34.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     StatusPill(
                         text = "Due",
-                        background = Color(0xFFFFF3CD),
-                        content = Color(0xFF92400E)
+                        background = MaterialTheme.rentWalletColors.warningContainer,
+                        content = MaterialTheme.rentWalletColors.warning
                     )
                 }
 
@@ -683,7 +1130,7 @@ private fun PayRentScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -691,7 +1138,7 @@ private fun PayRentScreen(
             ) {
                 Text(
                     text = "Payment method",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -699,7 +1146,7 @@ private fun PayRentScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFE6F4F1), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
                         .padding(16.dp)
                 ) {
                     Column {
@@ -712,7 +1159,7 @@ private fun PayRentScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Pay using your preferred bank or UPI method.",
-                            color = Color(0xFF475467),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             lineHeight = 19.sp
                         )
@@ -732,7 +1179,7 @@ private fun PayRentScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -740,7 +1187,7 @@ private fun PayRentScreen(
             ) {
                 Text(
                     text = "Payment summary",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -753,7 +1200,7 @@ private fun PayRentScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFF2F4F7), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
                         .padding(14.dp)
                 ) {
                     Row(
@@ -763,7 +1210,7 @@ private fun PayRentScreen(
                     ) {
                         Text(
                             text = "Total payable",
-                            color = Color(0xFF101828),
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -791,7 +1238,7 @@ private fun PayRentScreen(
                 .height(54.dp),
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF0F766E),
+                containerColor = MaterialTheme.rentWalletColors.tenantPrimary,
                 contentColor = Color.White
             )
         ) {
@@ -814,7 +1261,7 @@ private fun PaymentSuccessScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .padding(horizontal = 20.dp, vertical = 32.dp),
@@ -823,12 +1270,12 @@ private fun PaymentSuccessScreen(
         Box(
             modifier = Modifier
                 .size(86.dp)
-                .background(Color(0xFFE6F4EA), RoundedCornerShape(8.dp)),
+                .background(MaterialTheme.rentWalletColors.successContainer, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "Paid",
-                color = Color(0xFF137333),
+                color = MaterialTheme.rentWalletColors.success,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -838,7 +1285,7 @@ private fun PaymentSuccessScreen(
 
         Text(
             text = "Payment Successful",
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
@@ -846,7 +1293,7 @@ private fun PaymentSuccessScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Amit Sharma's landlord wallet has been credited.",
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 16.sp,
             lineHeight = 23.sp,
             textAlign = TextAlign.Center
@@ -857,7 +1304,7 @@ private fun PaymentSuccessScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -877,7 +1324,7 @@ private fun PaymentSuccessScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFE6F4F1), RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
                 .padding(16.dp)
         ) {
             Text(
@@ -898,7 +1345,7 @@ private fun PaymentSuccessScreen(
                 .height(54.dp),
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF0F766E),
+                containerColor = MaterialTheme.rentWalletColors.tenantPrimary,
                 contentColor = Color.White
             )
         ) {
@@ -923,7 +1370,7 @@ private fun PaymentHistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -934,14 +1381,14 @@ private fun PaymentHistoryScreen(
         ) {
             Text(
                 text = "Payment History",
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Track paid, pending, and failed rent payments.",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 15.sp,
                 lineHeight = 22.sp
             )
@@ -951,7 +1398,7 @@ private fun PaymentHistoryScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F766E)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.rentWalletColors.tenantPrimary),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
@@ -988,19 +1435,19 @@ private fun PaymentHistoryScreen(
                 StatusSummaryChip(
                     label = "Paid",
                     count = "2",
-                    color = Color(0xFF137333),
+                    color = MaterialTheme.rentWalletColors.success,
                     modifier = Modifier.weight(1f)
                 )
                 StatusSummaryChip(
                     label = "Pending",
                     count = "1",
-                    color = Color(0xFF92400E),
+                    color = MaterialTheme.rentWalletColors.warning,
                     modifier = Modifier.weight(1f)
                 )
                 StatusSummaryChip(
                     label = "Failed",
                     count = "1",
-                    color = Color(0xFFB42318),
+                    color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1010,7 +1457,7 @@ private fun PaymentHistoryScreen(
             AlertsSection(
                 title = "Payment alerts",
                 alerts = tenantPaymentAlerts,
-                accent = Color(0xFF0F766E)
+                accent = MaterialTheme.rentWalletColors.tenantPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -1043,7 +1490,7 @@ private fun PaymentHistoryRow(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -1058,14 +1505,14 @@ private fun PaymentHistoryRow(
                 ) {
                     Text(
                         text = payment.month,
-                        color = Color(0xFF101828),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = payment.dateLabel,
-                        color = Color(0xFF667085),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                 }
@@ -1094,7 +1541,7 @@ private fun PaymentHistoryRow(
             ) {
                 Text(
                     text = payment.amount,
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -1118,7 +1565,7 @@ private fun ReceiptDetailsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .padding(horizontal = 20.dp, vertical = 24.dp)
@@ -1127,7 +1574,7 @@ private fun ReceiptDetailsScreen(
             onClick = onBack,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFF344054)
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         ) {
             Text(text = "Back")
@@ -1137,14 +1584,14 @@ private fun ReceiptDetailsScreen(
 
         Text(
             text = "Receipt Details",
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = payment.month,
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 15.sp
         )
 
@@ -1153,7 +1600,7 @@ private fun ReceiptDetailsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -1168,7 +1615,7 @@ private fun ReceiptDetailsScreen(
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = payment.amount,
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 34.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
@@ -1180,7 +1627,7 @@ private fun ReceiptDetailsScreen(
                     } else {
                         "Wallet credit pending"
                     },
-                    color = Color(0xFF667085),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center
                 )
@@ -1190,7 +1637,7 @@ private fun ReceiptDetailsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -1222,7 +1669,7 @@ private fun TenantProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -1239,7 +1686,7 @@ private fun TenantProfileScreen(
                 initials = "RM",
                 name = "Rohan Mehta",
                 role = "Tenant",
-                accent = Color(0xFF0F766E)
+                accent = MaterialTheme.rentWalletColors.tenantPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -1302,7 +1749,7 @@ private fun LandlordProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -1319,7 +1766,7 @@ private fun LandlordProfileScreen(
                 initials = "AS",
                 name = "Amit Sharma",
                 role = "Landlord",
-                accent = Color(0xFFB7791F)
+                accent = MaterialTheme.rentWalletColors.landlordPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -1393,14 +1840,14 @@ private fun ProfileTitle(
     Column {
         Text(
             text = title,
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = subtitle,
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 15.sp,
             lineHeight = 22.sp
         )
@@ -1418,7 +1865,7 @@ private fun ProfileHeroCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -1444,14 +1891,14 @@ private fun ProfileHeroCard(
             ) {
                 Text(
                     text = name,
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = role,
-                    color = Color(0xFF667085),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             }
@@ -1468,7 +1915,7 @@ private fun ProfileInfoCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -1476,7 +1923,7 @@ private fun ProfileInfoCard(
         ) {
             Text(
                 text = title,
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -1497,7 +1944,7 @@ private fun LandlordDashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -1525,7 +1972,7 @@ private fun LandlordDashboardScreen(
             AlertsSection(
                 title = "Important alerts",
                 alerts = landlordDashboardAlerts,
-                accent = Color(0xFFB7791F)
+                accent = MaterialTheme.rentWalletColors.landlordPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -1563,13 +2010,13 @@ private fun LandlordHeader() {
             ) {
                 Text(
                     text = "Hello, Amit",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Your landlord wallet overview",
-                    color = Color(0xFF667085),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             }
@@ -1583,7 +2030,7 @@ private fun LandlordWalletCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFB7791F)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.rentWalletColors.landlordPrimary),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -1633,7 +2080,7 @@ private fun LandlordWalletCard() {
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White,
-                    contentColor = Color(0xFFB7791F)
+                    contentColor = MaterialTheme.rentWalletColors.landlordOnPrimary
                 )
             ) {
                 Text(
@@ -1652,7 +2099,7 @@ private fun LandlordCollectionSummary() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -1660,14 +2107,14 @@ private fun LandlordCollectionSummary() {
         ) {
                 Text(
                     text = "May collection summary",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "3 of 5 tenants have paid this month.",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )
@@ -1717,7 +2164,7 @@ private fun LandlordAttentionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E6)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -1732,14 +2179,14 @@ private fun LandlordAttentionCard(
                 ) {
                     Text(
                         text = "2 rents pending",
-                        color = Color(0xFF92400E),
+                        color = MaterialTheme.rentWalletColors.warning,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Arjun and Neha still need to complete May rent.",
-                        color = Color(0xFF475467),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         lineHeight = 19.sp
                     )
@@ -1748,7 +2195,7 @@ private fun LandlordAttentionCard(
                     onClick = onOpenTenants,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFF92400E)
+                        contentColor = MaterialTheme.rentWalletColors.warning
                     )
                 ) {
                     Text(text = "Review")
@@ -1767,13 +2214,13 @@ private fun CollectionProgressBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(10.dp)
-            .background(Color(0xFFF2F4F7), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
                 .height(10.dp)
-                .background(Color(0xFFB7791F), RoundedCornerShape(8.dp))
+                .background(MaterialTheme.rentWalletColors.landlordPrimary, RoundedCornerShape(8.dp))
         )
     }
 }
@@ -1784,7 +2231,7 @@ private fun LandlordRecentTransactions() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -1792,7 +2239,7 @@ private fun LandlordRecentTransactions() {
         ) {
             Text(
                 text = "Recent wallet transactions",
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -1823,13 +2270,13 @@ private fun WalletTransactionRow(
         ) {
             Text(
                 text = title,
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = detail,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
         }
@@ -1838,7 +2285,7 @@ private fun WalletTransactionRow(
         ) {
             Text(
                 text = amount,
-                color = if (amount.startsWith("+")) Color(0xFF137333) else Color(0xFFB42318),
+                color = if (amount.startsWith("+")) MaterialTheme.rentWalletColors.success else MaterialTheme.colorScheme.error,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.End
@@ -1846,8 +2293,8 @@ private fun WalletTransactionRow(
             Spacer(modifier = Modifier.height(4.dp))
             StatusPill(
                 text = status,
-                background = if (status == "Credited") Color(0xFFE6F4EA) else Color(0xFFFFF3CD),
-                content = if (status == "Credited") Color(0xFF137333) else Color(0xFF92400E)
+                background = if (status == "Credited") MaterialTheme.rentWalletColors.successContainer else MaterialTheme.rentWalletColors.warningContainer,
+                content = if (status == "Credited") MaterialTheme.rentWalletColors.success else MaterialTheme.rentWalletColors.warning
             )
         }
     }
@@ -1861,7 +2308,7 @@ private fun LandlordTenantPreview(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -1873,7 +2320,7 @@ private fun LandlordTenantPreview(
             ) {
                 Text(
                     text = "Tenant rent status",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -1882,7 +2329,7 @@ private fun LandlordTenantPreview(
                     onClick = onOpenTenants,
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFFB7791F)
+                        contentColor = MaterialTheme.rentWalletColors.landlordOnPrimary
                     )
                 ) {
                     Text(text = "View all")
@@ -1916,13 +2363,13 @@ private fun TenantStatusRow(
         ) {
             Text(
                 text = name,
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = "$property • $amount • $date",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1946,7 +2393,7 @@ private fun LandlordTenantsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -1957,14 +2404,14 @@ private fun LandlordTenantsScreen(
         ) {
             Text(
                 text = "Tenants",
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Review each tenant, property, and rent status.",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 15.sp,
                 lineHeight = 22.sp
             )
@@ -1978,13 +2425,13 @@ private fun LandlordTenantsScreen(
                 StatusSummaryChip(
                     label = "Paid",
                     count = "3",
-                    color = Color(0xFF137333),
+                    color = MaterialTheme.rentWalletColors.success,
                     modifier = Modifier.weight(1f)
                 )
                 StatusSummaryChip(
                     label = "Pending",
                     count = "2",
-                    color = Color(0xFF92400E),
+                    color = MaterialTheme.rentWalletColors.warning,
                     modifier = Modifier.weight(1f)
                 )
                 StatusSummaryChip(
@@ -2000,7 +2447,7 @@ private fun LandlordTenantsScreen(
             AlertsSection(
                 title = "Tenant alerts",
                 alerts = landlordTenantAlerts,
-                accent = Color(0xFFB7791F)
+                accent = MaterialTheme.rentWalletColors.landlordPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -2035,7 +2482,7 @@ private fun TenantListCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -2050,14 +2497,14 @@ private fun TenantListCard(
                 ) {
                     Text(
                         text = tenant.tenantName,
-                        color = Color(0xFF101828),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = tenant.propertyName,
-                        color = Color(0xFF475467),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -2073,7 +2520,7 @@ private fun TenantListCard(
 
             Text(
                 text = tenant.address,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 lineHeight = 19.sp
             )
@@ -2082,7 +2529,7 @@ private fun TenantListCard(
 
             Text(
                 text = "Contact ${tenant.contact} • Wallet ${tenant.walletStatus}",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -2098,13 +2545,13 @@ private fun TenantListCard(
                 Column {
                     Text(
                         text = tenant.rent,
-                        color = Color(0xFF101828),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = tenant.dateLabel,
-                        color = Color(0xFF667085),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                 }
@@ -2128,7 +2575,7 @@ private fun PropertyDetailsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .statusBarsPadding()
             .padding(horizontal = 20.dp, vertical = 24.dp)
@@ -2137,7 +2584,7 @@ private fun PropertyDetailsScreen(
             onClick = onBack,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFF344054)
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         ) {
             Text(text = "Back")
@@ -2147,7 +2594,7 @@ private fun PropertyDetailsScreen(
 
         Text(
             text = tenant.propertyName,
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold,
             lineHeight = 36.sp
@@ -2155,7 +2602,7 @@ private fun PropertyDetailsScreen(
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = tenant.address,
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 15.sp,
             lineHeight = 22.sp
         )
@@ -2165,7 +2612,7 @@ private fun PropertyDetailsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFB7791F)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.rentWalletColors.landlordPrimary),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
@@ -2213,7 +2660,7 @@ private fun PropertyDetailsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -2221,7 +2668,7 @@ private fun PropertyDetailsScreen(
             ) {
                 Text(
                     text = "Tenant details",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -2239,7 +2686,7 @@ private fun PropertyDetailsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(
@@ -2247,7 +2694,7 @@ private fun PropertyDetailsScreen(
             ) {
                 Text(
                     text = "Lease and wallet",
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -2275,7 +2722,7 @@ private fun PropertyWalletStatusCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isPaid) Color(0xFFE6F4EA) else Color(0xFFFFF8E6)
+            containerColor = if (isPaid) MaterialTheme.rentWalletColors.successContainer else Color(0xFFFFF8E6)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -2284,7 +2731,7 @@ private fun PropertyWalletStatusCard(
         ) {
             Text(
                 text = if (isPaid) "Wallet credited" else "Wallet credit pending",
-                color = if (isPaid) Color(0xFF137333) else Color(0xFF92400E),
+                color = if (isPaid) MaterialTheme.rentWalletColors.success else MaterialTheme.rentWalletColors.warning,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -2295,7 +2742,7 @@ private fun PropertyWalletStatusCard(
                 } else {
                     "${tenant.tenantName}'s ${tenant.rent} rent is still pending."
                 },
-                color = Color(0xFF475467),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 lineHeight = 19.sp
             )
@@ -2317,13 +2764,13 @@ private fun DashboardHeader(
         ) {
             Text(
                 text = "Hello, Rohan",
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "Your May rent overview",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
         }
@@ -2332,7 +2779,7 @@ private fun DashboardHeader(
             onClick = onLogout,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFF344054)
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         ) {
             Text(text = "Logout")
@@ -2348,7 +2795,7 @@ private fun CurrentRentCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F766E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.rentWalletColors.tenantPrimary),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -2377,8 +2824,8 @@ private fun CurrentRentCard(
 
                 StatusPill(
                     text = "Pending",
-                    background = Color(0xFFFFF3CD),
-                    content = Color(0xFF92400E)
+                    background = MaterialTheme.rentWalletColors.warningContainer,
+                    content = MaterialTheme.rentWalletColors.warning
                 )
             }
 
@@ -2398,7 +2845,7 @@ private fun CurrentRentCard(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White,
-                    contentColor = Color(0xFF0F766E)
+                    contentColor = MaterialTheme.rentWalletColors.tenantOnPrimary
                 )
             ) {
                 Text(
@@ -2417,7 +2864,7 @@ private fun TenantRentStatusCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E6)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -2432,14 +2879,14 @@ private fun TenantRentStatusCard() {
                 ) {
                     Text(
                         text = "Due in 3 days",
-                        color = Color(0xFF92400E),
+                        color = MaterialTheme.rentWalletColors.warning,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Pay before 10 May to keep this month marked on time.",
-                        color = Color(0xFF475467),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         lineHeight = 19.sp
                     )
@@ -2447,7 +2894,7 @@ private fun TenantRentStatusCard() {
                 StatusPill(
                     text = "Action",
                     background = Color.White,
-                    content = Color(0xFF92400E)
+                    content = MaterialTheme.rentWalletColors.warning
                 )
             }
         }
@@ -2460,7 +2907,7 @@ private fun PropertySummaryCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -2468,21 +2915,21 @@ private fun PropertySummaryCard() {
         ) {
             Text(
                 text = "Property",
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Green View Residency",
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Flat 4B, Salt Lake, Kolkata",
-                color = Color(0xFF475467),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )
@@ -2520,7 +2967,7 @@ private fun SmallMetricCard(
     Card(
         modifier = modifier.heightIn(min = 94.dp),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -2528,13 +2975,13 @@ private fun SmallMetricCard(
         ) {
             Text(
                 text = label,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = value,
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -2550,7 +2997,7 @@ private fun RecentPaymentsCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -2558,7 +3005,7 @@ private fun RecentPaymentsCard() {
         ) {
             Text(
                 text = "Recent payments",
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -2576,20 +3023,20 @@ private fun PaymentSafetyNote() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFEFF8FF), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.rentWalletColors.infoContainer, RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
         Column {
             Text(
                 text = "Payment review",
-                color = Color(0xFF175CD3),
+                color = MaterialTheme.rentWalletColors.info,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Confirming marks the rent as paid and credits the landlord wallet in this app flow.",
-                color = Color(0xFF475467),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 lineHeight = 19.sp
             )
@@ -2608,7 +3055,7 @@ private fun StatusSummaryChip(
     Card(
         modifier = modifier.heightIn(min = 72.dp),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -2625,7 +3072,7 @@ private fun StatusSummaryChip(
             )
             Text(
                 text = label,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -2644,7 +3091,7 @@ private fun AlertsSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -2652,7 +3099,7 @@ private fun AlertsSection(
         ) {
             Text(
                 text = title,
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -2703,7 +3150,7 @@ private fun AlertRow(
             ) {
                 Text(
                     text = alert.title,
-                    color = Color(0xFF101828),
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -2718,7 +3165,7 @@ private fun AlertRow(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = alert.message,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp,
                 lineHeight = 19.sp
             )
@@ -2742,20 +3189,20 @@ private fun PaymentPreviewRow(
         ) {
             Text(
                 text = month,
-                color = Color(0xFF101828),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = amount,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
         }
         StatusPill(
             text = status,
-            background = Color(0xFFE6F4EA),
-            content = Color(0xFF137333)
+            background = MaterialTheme.rentWalletColors.successContainer,
+            content = MaterialTheme.rentWalletColors.success
         )
     }
 }
@@ -2775,14 +3222,14 @@ private fun PaymentInfoRow(
     ) {
         Text(
             text = label,
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp,
             modifier = Modifier.weight(1f)
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = value,
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.End,
@@ -2838,17 +3285,19 @@ private fun StatusPill(
 }
 
 
+@Composable
 private fun paymentStatusBackground(status: String): Color = when (status) {
-    "Paid" -> Color(0xFFE6F4EA)
-    "Pending" -> Color(0xFFFFF3CD)
-    "Failed" -> Color(0xFFFEE4E2)
+    "Paid" -> MaterialTheme.rentWalletColors.successContainer
+    "Pending" -> MaterialTheme.rentWalletColors.warningContainer
+    "Failed" -> MaterialTheme.colorScheme.errorContainer
     else -> Color(0xFFF2F4F7)
 }
 
+@Composable
 private fun paymentStatusContent(status: String): Color = when (status) {
-    "Paid" -> Color(0xFF137333)
-    "Pending" -> Color(0xFF92400E)
-    "Failed" -> Color(0xFFB42318)
+    "Paid" -> MaterialTheme.rentWalletColors.success
+    "Pending" -> MaterialTheme.rentWalletColors.warning
+    "Failed" -> MaterialTheme.colorScheme.error
     else -> Color(0xFF475467)
 }
 
@@ -2859,17 +3308,19 @@ private fun receiptActionText(status: String): String = when (status) {
     else -> "Payment details available."
 }
 
+@Composable
 private fun alertBackground(status: String, accent: Color): Color = when (status) {
-    "Paid", "Receipt" -> Color(0xFFE6F4EA)
-    "Due", "Pending", "Action", "Processing" -> Color(0xFFFFF3CD)
-    "Failed" -> Color(0xFFFEE4E2)
+    "Paid", "Receipt" -> MaterialTheme.rentWalletColors.successContainer
+    "Due", "Pending", "Action", "Processing" -> MaterialTheme.rentWalletColors.warningContainer
+    "Failed" -> MaterialTheme.colorScheme.errorContainer
     else -> accent.copy(alpha = 0.12f)
 }
 
+@Composable
 private fun alertContent(status: String, accent: Color): Color = when (status) {
-    "Paid", "Receipt" -> Color(0xFF137333)
-    "Due", "Pending", "Action", "Processing" -> Color(0xFF92400E)
-    "Failed" -> Color(0xFFB42318)
+    "Paid", "Receipt" -> MaterialTheme.rentWalletColors.success
+    "Due", "Pending", "Action", "Processing" -> MaterialTheme.rentWalletColors.warning
+    "Failed" -> MaterialTheme.colorScheme.error
     else -> accent
 }
 
@@ -2883,7 +3334,7 @@ private fun TenantBottomBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2920,7 +3371,7 @@ private fun LandlordBottomBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -2928,21 +3379,21 @@ private fun LandlordBottomBar(
         BottomMenuItem(
             title = "Dashboard",
             selected = selectedTab == "Dashboard",
-            selectedColor = Color(0xFFB7791F),
+            selectedColor = MaterialTheme.rentWalletColors.landlordPrimary,
             onClick = onDashboard,
             modifier = Modifier.weight(1f)
         )
         BottomMenuItem(
             title = "Tenants",
             selected = selectedTab == "Tenants",
-            selectedColor = Color(0xFFB7791F),
+            selectedColor = MaterialTheme.rentWalletColors.landlordPrimary,
             onClick = onTenants,
             modifier = Modifier.weight(1f)
         )
         BottomMenuItem(
             title = "Profile",
             selected = selectedTab == "Profile",
-            selectedColor = Color(0xFFB7791F),
+            selectedColor = MaterialTheme.rentWalletColors.landlordPrimary,
             onClick = onProfile,
             modifier = Modifier.weight(1f)
         )
@@ -2954,7 +3405,7 @@ private fun LandlordBottomBar(
 private fun BottomMenuItem(
     title: String,
     selected: Boolean,
-    selectedColor: Color = Color(0xFF0F766E),
+    selectedColor: Color = MaterialTheme.rentWalletColors.tenantPrimary,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -2992,14 +3443,14 @@ private fun LandlordPlaceholderScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F8FA))
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "Landlord Dashboard",
-            color = Color(0xFF101828),
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
@@ -3007,7 +3458,7 @@ private fun LandlordPlaceholderScreen(
         Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = "This side will be added after the tenant rent flow is ready.",
-            color = Color(0xFF667085),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 16.sp,
             lineHeight = 23.sp,
             textAlign = TextAlign.Center
@@ -3017,7 +3468,7 @@ private fun LandlordPlaceholderScreen(
             onClick = onBack,
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFB7791F),
+                containerColor = MaterialTheme.rentWalletColors.landlordPrimary,
                 contentColor = Color.White
             )
         ) {
@@ -3060,13 +3511,13 @@ private fun LoginHero(role: UserRole) {
 
 @Composable
 private fun loginTextFieldColors(accent: Color) = TextFieldDefaults.colors(
-    focusedTextColor = Color(0xFF101828),
-    unfocusedTextColor = Color(0xFF101828),
-    focusedContainerColor = Color.White,
-    unfocusedContainerColor = Color.White,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
     cursorColor = accent,
     focusedIndicatorColor = accent,
-    unfocusedIndicatorColor = Color(0xFF98A2B3),
+    unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
     focusedLabelColor = accent,
-    unfocusedLabelColor = Color(0xFF475467)
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
 )

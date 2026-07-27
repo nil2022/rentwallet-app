@@ -59,6 +59,7 @@ fun LandingScreen(
                 title = "Tenant",
                 description = "Pay your rent easily and track history.",
                 accentColor = colors.tenantPrimary,
+                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 onClick = { onRoleSelected(LandingRole.Tenant) }
             )
 
@@ -70,6 +71,7 @@ fun LandingScreen(
                 title = "Landlord",
                 description = "Collect payments and manage properties.",
                 accentColor = colors.landlordPrimary,
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                 onClick = { onRoleSelected(LandingRole.Landlord) }
             )
 

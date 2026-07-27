@@ -34,7 +34,8 @@ fun RoleSelectionCard(
     description: String,
     accentColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest
 ) {
     Card(
         modifier = modifier
@@ -45,7 +46,7 @@ fun RoleSelectionCard(
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 1.dp
@@ -60,7 +61,7 @@ fun RoleSelectionCard(
             Surface(
                 modifier = Modifier.size(44.dp),
                 shape = CircleShape,
-                color = accentColor.copy(alpha = 0.25f)
+                color = iconContainerColor
             ) {
                 Icon(
                     imageVector = icon,
@@ -98,7 +99,7 @@ fun RoleSelectionCard(
             Surface(
                 modifier = Modifier.size(44.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = accentColor.copy(alpha = 0.20f)
+                color = iconContainerColor
             ) {
                 Icon(
                     imageVector = imageIcon,
@@ -112,3 +113,4 @@ fun RoleSelectionCard(
         }
     }
 }
+
