@@ -18,14 +18,14 @@ fun HeroSection(
         modifier = modifier
     ) {
         Text(
-            text = "Rent payments made simple.",
+            text = "Rent payments made clear",
             style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Helping tenants pay rent securely and landlords manage properties with confidence.",
+            text = "A simple rental wallet for tenants and landlords.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

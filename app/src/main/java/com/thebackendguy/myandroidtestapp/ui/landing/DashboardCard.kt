@@ -1,6 +1,6 @@
 package com.thebackendguy.myandroidtestapp.ui.landing
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,12 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun RoleSelectionCard(
+fun DashboardCard(
     icon: ImageVector,
     imageIcon: ImageVector,
     title: String,
@@ -37,15 +36,11 @@ fun RoleSelectionCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(
-                onClick = onClick,
-                role = Role.Button
-            ),
-        shape = RoundedCornerShape(20.dp),
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 1.dp
@@ -54,19 +49,19 @@ fun RoleSelectionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(48.dp),
                 shape = CircleShape,
-                color = accentColor.copy(alpha = 0.25f)
+                color = accentColor.copy(alpha = 0.1f)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
                     modifier = Modifier
-                        .padding(10.dp)
+                        .padding(12.dp)
                         .size(24.dp),
                     tint = accentColor
                 )
@@ -75,7 +70,8 @@ fun RoleSelectionCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = title,
@@ -93,20 +89,20 @@ fun RoleSelectionCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(64.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = accentColor.copy(alpha = 0.20f)
+                color = accentColor.copy(alpha = 0.08f)
             ) {
                 Icon(
                     imageVector = imageIcon,
                     contentDescription = null,
                     modifier = Modifier
-                        .padding(10.dp)
-                        .size(24.dp),
-                    tint = accentColor.copy(alpha = 0.85f)
+                        .padding(16.dp)
+                        .size(32.dp),
+                    tint = accentColor.copy(alpha = 0.6f)
                 )
             }
         }
