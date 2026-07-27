@@ -1,7 +1,7 @@
 package com.thebackendguy.myandroidtestapp.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
@@ -190,4 +190,4 @@ val LocalRentWalletColors = staticCompositionLocalOf {
 }
 
 val MaterialTheme.rentWalletColors: RentWalletColors
-    get() = LocalRentWalletColors.current
+    @Composable get() = LocalRentWalletColors.current
