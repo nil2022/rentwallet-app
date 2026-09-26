@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MyAndroidTestApp"
+rootProject.name = "RentFlow"
 include ':app'

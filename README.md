@@ -172,7 +172,7 @@ Every call is one the web app already makes. The landlord endpoints are under `/
 
 The app copies the phone design of the RentFlow web app (`rent-management-ui`), so both look the same.
 
-**Colours.** One primary colour for both roles, from the web’s Material 3 tokens ([`Color.kt`](app/src/main/java/com/thebackendguy/myandroidtestapp/ui/theme/Color.kt)):
+**Colours.** One primary colour for both roles, from the web’s Material 3 tokens ([`Color.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Color.kt)):
 
 | Role | Hex | | Role | Hex |
 |---|---|---|---|---|
@@ -183,7 +183,7 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Secondary container | `#82F5C1` | | On surface variant | `#464555` |
 | Error | `#BA1A1A` | | Inverse surface (dark cards) | `#213145` |
 
-**Type.** Plus Jakarta Sans, with the web’s phone type scale ([`Type.kt`](app/src/main/java/com/thebackendguy/myandroidtestapp/ui/theme/Type.kt)):
+**Type.** Plus Jakarta Sans, with the web’s phone type scale ([`Type.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Type.kt)):
 
 | Style | Size / line height | Weight | Used for |
 |---|---|---|---|
@@ -194,7 +194,7 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Body large / medium / small | 16 / 14 / 13 | Regular | Text |
 | Label medium / small | 13 / 11 | SemiBold | Buttons, chips, captions |
 
-**Icons.** Lucide v0.488, the same set and version as the web. They’re generated into [`Lucide.kt`](app/src/main/java/com/thebackendguy/myandroidtestapp/ui/icons/Lucide.kt) from the web project’s icon data.
+**Icons.** Lucide v0.488, the same set and version as the web. They’re generated into [`Lucide.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/icons/Lucide.kt) from the web project’s icon data.
 
 **Logo.** The web Home page logo: a `#4F46E5` tile with a white Lucide “Home” icon. It is also the adaptive launcher icon ([`ic_launcher_foreground.xml`](app/src/main/res/drawable/ic_launcher_foreground.xml)).
 
@@ -212,13 +212,13 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Images | Coil 3; photos are resized to 1600 px JPEGs before upload |
 | Session | Token and account details in SharedPreferences (only with “Remember me”) |
 | Navigation | A back stack of screens in Compose state, no navigation library |
-| Sample data | [`DemoData.kt`](app/src/main/java/com/thebackendguy/myandroidtestapp/data/DemoData.kt) for rent, payments and wallet |
+| Sample data | [`DemoData.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/data/DemoData.kt) for rent, payments and wallet |
 
 ## Project structure
 
 ```
 app/src/main/
-├── java/com/thebackendguy/myandroidtestapp/
+├── kotlin/com/thebackendguy/rentflow/
 │   ├── MainActivity.kt           # Screens, back stack, drawer, session handling
 │   ├── data/
 │   │   ├── AuthRepository.kt     # Sign-in, OTP, password reset, registration, log out
@@ -259,7 +259,7 @@ On Windows use `gradlew.bat assembleDebug`. The APK is written to `app/build/out
 
 ### Choosing the server
 
-The server address is set in code, in [`ApiConfig.kt`](app/src/main/java/com/thebackendguy/myandroidtestapp/data/remote/ApiConfig.kt). Keep one line and comment out the other:
+The server address is set in code, in [`ApiConfig.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/data/remote/ApiConfig.kt). Keep one line and comment out the other:
 
 ```kotlin
 // const val BASE_URL = "http://localhost:4000"          // local backend
