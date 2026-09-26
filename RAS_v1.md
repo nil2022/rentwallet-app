@@ -1,4 +1,4 @@
-# RentWallet Android — Software Architecture Specification (RAS v1.0)
+# RentFlow Android — Software Architecture Specification (RAS v1.0)
 
 | Metadata | Value |
 |----------|-------|
@@ -15,7 +15,7 @@
 
 ### Overall Philosophy
 
-The RentWallet Android application will adopt a **feature-first, layered architecture** built on four fundamental pillars:
+The RentFlow Android application will adopt a **feature-first, layered architecture** built on four fundamental pillars:
 
 1. **Separation of concerns** — UI, business logic, and data access live in distinct layers with strict dependency directions.
 2. **Unidirectional data flow** — State flows down; events flow up. Screens observe state and emit user intents; ViewModels process intents and update state.
@@ -524,9 +524,9 @@ feature/<feature-name>/
 ### 6.1 Complete Package Hierarchy (Single-Module Phase)
 
 ```
-com.rentwallet.app/
+com.rentflow.app/
 |
-+-- RentWalletApplication.kt              (Application class)
++-- RentFlowApplication.kt              (Application class)
 +-- MainActivity.kt                        (Single Activity, hosts NavHost)
 |
 +-- di/
@@ -549,8 +549,8 @@ com.rentwallet.app/
 |   |   |   +-- Type.kt
 |   |   |   +-- Shape.kt
 |   |   +-- component/
-|   |   |   +-- RentWalletButton.kt
-|   |   |   +-- RentWalletCard.kt
+|   |   |   +-- RentFlowButton.kt
+|   |   |   +-- RentFlowCard.kt
 |   |   |   +-- StatusPill.kt
 |   |   |   +-- InfoRow.kt
 |   |   |   +-- BottomBar.kt
@@ -570,7 +570,7 @@ com.rentwallet.app/
 |   |   |   +-- Spacing.kt                 (spacing constants: xs, sm, md, lg, xl)
 |   |   |   +-- Elevation.kt
 |   |   +-- icon/
-|   |       +-- RentWalletIcons.kt        (icon definitions)
+|   |       +-- RentFlowIcons.kt        (icon definitions)
 |   |       +-- AppIcon.kt                 (icon composable)
 |   |
 |   +-- model/
@@ -600,7 +600,7 @@ com.rentwallet.app/
 |   |   +-- ErrorInterceptor.kt
 |   |
 |   +-- database/
-|       +-- RentWalletDatabase.kt
+|       +-- RentFlowDatabase.kt
 |       +-- Converters.kt                 (type converters for Room)
 |
 +-- feature/
@@ -819,7 +819,7 @@ com.rentwallet.app/
 
 ### 7.5 Import Rules
 
-- Wildcard imports (`import com.rentwallet.feature.tenant.*`) are forbidden. Every import must be explicit.
+- Wildcard imports (`import com.rentflow.feature.tenant.*`) are forbidden. Every import must be explicit.
 - Internal package imports within a feature (e.g., `ui/` importing from `domain/`) are permitted without restriction.
 - Cross-package imports must be reviewed for architectural compliance.
 
@@ -1155,7 +1155,7 @@ sealed class Route(val route: String) {
 ### 10.5 Deep Links
 
 - Each route must support deep link configuration for future notification support.
-- Deep link format: `rentwallet://<route>` (e.g., `rentwallet://tenant/payments/receipt/{id}`).
+- Deep link format: `rentflow://<route>` (e.g., `rentflow://tenant/payments/receipt/{id}`).
 - Deep links to authenticated routes trigger auth guard: if not logged in, navigate to login first, then complete the deep link.
 
 ### 10.6 Scalability
@@ -1184,8 +1184,8 @@ sealed class Route(val route: String) {
 - `Elevation.kt` — elevation constants
 
 **Atomic Components (reused across 3+ features):**
-- `RentWalletButton.kt` — primary, secondary, outline, text variants with consistent styling
-- `RentWalletCard.kt` — elevated, filled, outlined card variants
+- `RentFlowButton.kt` — primary, secondary, outline, text variants with consistent styling
+- `RentFlowCard.kt` — elevated, filled, outlined card variants
 - `StatusPill.kt` — colored status badge (currently duplicated in 15+ places)
 - `InfoRow.kt` — label-value text row (currently `PaymentInfoRow` + `DashboardDetailRow`)
 - `BottomBar.kt` — parameterizable bottom navigation bar (currently `TenantBottomBar` + `LandlordBottomBar`)
@@ -1386,7 +1386,7 @@ Composable
 
 | Artifact | Convention | Example |
 |----------|-----------|---------|
-| **Package** | Lowercase, domain-first | `com.rentwallet.feature.payments.ui` |
+| **Package** | Lowercase, domain-first | `com.rentflow.feature.payments.ui` |
 | **Class/Interface** | PascalCase | `ProcessPaymentUseCase`, `PaymentsRepository` |
 | **Composable function** | PascalCase | `fun PaymentHistoryScreen(...)` |
 | **ViewModel** | PascalCase, ends with `ViewModel` | `LoginViewModel` |
@@ -1500,7 +1500,7 @@ The migration from the current prototype to the target architecture is an **evol
 - Extract screen composables into their respective `feature/*/ui/` packages.
 - This is a mechanical file-split operation. Each screen becomes a separate file.
 - Navigation lambdas remain as parameters (temporary — will be replaced in Phase 5).
-- `RentWalletApp()` is replaced with a structured navigation host.
+- `RentFlowApp()` is replaced with a structured navigation host.
 - `MainActivity.kt` shrinks from 3,259 lines to approximately 50 lines.
 
 **Phase 3: State Management (ViewModel Layer)**
@@ -1571,7 +1571,7 @@ The migration from the current prototype to the target architecture is an **evol
 
 ## 16. Final Architectural Vision
 
-### What RentWallet Looks Like After Migration
+### What RentFlow Looks Like After Migration
 
 **Maintainability:**
 - Every file is under 400 lines.
@@ -1617,11 +1617,11 @@ The migration from the current prototype to the target architecture is an **evol
 
 ### The Architecture in Three Sentences
 
-The RentWallet Android application is a **feature-first, multi-layer architecture** where each business capability (auth, tenant, landlord, payments, profile) is a self-contained vertical slice through UI, domain logic, and data access. Layers communicate through explicit contracts (use cases, repository interfaces, StateFlow) and never through implicit coupling. The result is an application that can grow from 5 features to 50 without architectural friction, where a new feature can be added by creating 6 files and registering 2 things (a NavGraph and a DI module) — without modifying any existing code.
+The RentFlow Android application is a **feature-first, multi-layer architecture** where each business capability (auth, tenant, landlord, payments, profile) is a self-contained vertical slice through UI, domain logic, and data access. Layers communicate through explicit contracts (use cases, repository interfaces, StateFlow) and never through implicit coupling. The result is an application that can grow from 5 features to 50 without architectural friction, where a new feature can be added by creating 6 files and registering 2 things (a NavGraph and a DI module) — without modifying any existing code.
 
 ---
 
-*End of RentWallet Android — Software Architecture Specification (RAS v1.0)*
+*End of RentFlow Android — Software Architecture Specification (RAS v1.0)*
 *This document contains no implementation code, no library selections, and no refactoring steps.*
 *It is a pure architectural contract for the engineering team.*
 

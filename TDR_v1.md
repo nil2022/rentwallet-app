@@ -1,8 +1,8 @@
-# RentWallet Android — Technology Decision Record (TDR v1.0)
+# RentFlow Android — Technology Decision Record (TDR v1.0)
 
 **Document Status:** Approved
 **Version:** 1.0
-**Applies To:** RentWallet Android Application
+**Applies To:** RentFlow Android Application
 **Preceding Document:** Software Architecture Specification (RAS v1.0)
 
 ---
@@ -36,11 +36,11 @@ Select the primary programming language for all Android application development.
 
 ### 1.5 Justification
 
-Kotlin is the natural choice for RentWallet because every layer of the RAS architecture benefits from Kotlin-specific features that Java cannot provide:
+Kotlin is the natural choice for RentFlow because every layer of the RAS architecture benefits from Kotlin-specific features that Java cannot provide:
 
 - **Coroutines and Flow** are the foundation of the RAS state management philosophy (StateFlow, SharedFlow, reactive data pipelines). Using Java would require a reactive library (RxJava) that introduces conceptual overlap and higher cognitive load.
 - **Sealed classes** are essential for the RAS UiState/UiEvent pattern. Java's sealed classes (introduced in Java 17) are available but less ergonomic and require API 34+ desugaring.
-- **Null safety** directly reduces runtime crashes in a production SaaS application. RentWallet handles user-generated data (payment amounts, lease terms) where null handling errors cause real financial data issues.
+- **Null safety** directly reduces runtime crashes in a production SaaS application. RentFlow handles user-generated data (payment amounts, lease terms) where null handling errors cause real financial data issues.
 - **Compose** is Kotlin-first. The existing prototype is already 100% Kotlin. Introducing Java would serve no purpose and increase compilation time.
 - **Backend compatibility is irrelevant** — the language decision is Android-only. Kotlin communicates with the Node.js backend via JSON/HTTP, which is language-agnostic.
 
@@ -98,16 +98,16 @@ Select the UI rendering framework.
 
 ### 2.5 Justification
 
-The existing prototype is entirely Compose — 52 composable functions across 3,259 lines. Adopting XML Views would require rewriting the entire UI. Compose is the correct choice for RentWallet because:
+The existing prototype is entirely Compose — 52 composable functions across 3,259 lines. Adopting XML Views would require rewriting the entire UI. Compose is the correct choice for RentFlow because:
 
 - **State-driven UI aligns with RAS:** Compose's declarative model (UI = f(state)) directly maps to the RAS UiState pattern. Every screen renders a UiState sealed class — Compose is the only framework that natively supports this without adapters.
-- **Theme consistency:** RentWallet's MaterialTheme-based design system (already partially defined in Color.kt, Theme.kt, Type.kt) maps directly to Compose's MaterialTheme. XML Views would require manual theme synchronization.
+- **Theme consistency:** RentFlow's MaterialTheme-based design system (already partially defined in Color.kt, Theme.kt, Type.kt) maps directly to Compose's MaterialTheme. XML Views would require manual theme synchronization.
 - **Preview-driven development:** The RAS calls for `@Preview` on every screen composable. Compose's instant preview enables rapid iteration without build-deploy cycles — critical for a team that will grow to multiple feature teams.
-- **Performance for rental data:** Compose's recomposition granularity handles lists of properties, payment records, and alerts efficiently. The RentWallet UI is form-and-list heavy, not animation-heavy — Compose excels here.
+- **Performance for rental data:** Compose's recomposition granularity handles lists of properties, payment records, and alerts efficiently. The RentFlow UI is form-and-list heavy, not animation-heavy — Compose excels here.
 
 ### 2.6 Trade-offs
 
-- Compose requires API 21+ (acceptable — RentWallet targets API 26+).
+- Compose requires API 21+ (acceptable — RentFlow targets API 26+).
 - Compose has a larger APK footprint than equivalent XML (~1-2MB additional from Compose runtime and Material3 libraries). Acceptable for a production SaaS app.
 - Compose tooling (layout inspector, recomposition counts) is less mature than XML tooling. The gap is closing rapidly and does not affect decision.
 
@@ -162,10 +162,10 @@ Select the architectural pattern that structures how the application code is org
 
 The RAS already defines a four-layer architecture (Composable → ViewModel → Domain → Data) that is a direct combination of MVVM (presentation layer pattern) and Clean Architecture (layer separation with dependency inversion). Adopting any other architecture would require redesigning the RAS.
 
-This combination was chosen for RentWallet because:
+This combination was chosen for RentFlow because:
 
-- **VM + Domain separation isolates business rules.** The RAS identifies that RentWallet's business logic (rent calculations, payment validation, lease date math, role-based access) must live in domain-layer Use Cases, not in ViewModels or composables. MVVM alone would place business logic in ViewModels, making them harder to test and maintain.
-- **Data layer independence enables offline-first.** Clean Architecture's repository abstraction means the composable and ViewModel never know whether data comes from the network, Room, or a cache. This is essential for RentWallet's future offline requirement.
+- **VM + Domain separation isolates business rules.** The RAS identifies that RentFlow's business logic (rent calculations, payment validation, lease date math, role-based access) must live in domain-layer Use Cases, not in ViewModels or composables. MVVM alone would place business logic in ViewModels, making them harder to test and maintain.
+- **Data layer independence enables offline-first.** Clean Architecture's repository abstraction means the composable and ViewModel never know whether data comes from the network, Room, or a cache. This is essential for RentFlow's future offline requirement.
 - **Feature-first + Clean Architecture are compatible.** The RAS feature-first structure (feature/tenant/ui, feature/tenant/domain, feature/tenant/data) IS Clean Architecture within each feature.
 - **No architectural mismatch.** The prototype currently mixes all responsibilities in one file. The RAS correctly decomposes those responsibilities into layers. MVVM + Clean Architecture is the destination.
 
@@ -187,7 +187,7 @@ This combination was chosen for RentWallet because:
 
 ### 3.8 Alternatives Rejected
 
-**MVVM alone (without domain/data layers):** Rejected because the RAS explicitly requires domain and data layers. RentWallet's business logic (rent pro-ration, payment status transitions, lease date calculations) cannot live in ViewModels without violating single responsibility. The RAS already analyzed and rejected this approach in the gap analysis (18% architecture fit).
+**MVVM alone (without domain/data layers):** Rejected because the RAS explicitly requires domain and data layers. RentFlow's business logic (rent pro-ration, payment status transitions, lease date calculations) cannot live in ViewModels without violating single responsibility. The RAS already analyzed and rejected this approach in the gap analysis (18% architecture fit).
 
 **MVI:** Rejected despite its conceptual appeal. MVI adds an indirection layer (Intent → Reducer → State) that duplicates ViewModel's role. The RAS UiEvent pattern is already sufficiently close to MVI's intent channel without the strict reducer requirement. MVI's "single sealed state" is already part of the RAS' UiState pattern. Adding full MVI would provide marginal benefit at the cost of additional boilerplate.
 
@@ -292,7 +292,7 @@ Select the mechanism for managing dependency lifetimes, wiring, and provision.
 
 ### 5.5 Justification
 
-Hilt is the correct DI framework for RentWallet because:
+Hilt is the correct DI framework for RentFlow because:
 
 - **Official Google recommendation.** Hilt is the standard DI framework for modern Android applications. It is maintained by Google alongside Jetpack libraries, ensuring compatibility with Navigation Compose, ViewModel, Room, WorkManager, and all other RAS-selected technologies.
 - **ViewModel injection is seamless.** Hilt's `@HiltViewModel` annotation integrates directly with `viewModel()` in Compose, requiring zero manual ViewModel factory code. This directly supports the RAS requirement that every screen has exactly one ViewModel created by the DI framework.
@@ -369,12 +369,12 @@ Select the HTTP client and networking library for communicating with the Node.js
 
 ### 6.5 Justification
 
-Retrofit is the correct networking layer for RentWallet because:
+Retrofit is the correct networking layer for RentFlow because:
 
-- **Type-safe API interfaces map directly to REST endpoints.** RentWallet's Node.js/Express.js backend exposes REST APIs with JSON bodies. Retrofit's annotation-based interface (`@GET`, `@POST`, `@Body`) defines each API endpoint as a Kotlin suspend function with typed DTOs. This directly supports the RAS data layer requirement that each feature's `data/` package contains an API service interface.
-- **Coroutine integration is first-class.** Retrofit 3.x (rebase on Kotlin Coroutines) provides suspend function return types and `CallAdapter` for `Response<T>` and `Result<T>`. RentWallet's ViewModels call use cases that call repositories that call Retrofit services — each step is a suspend function in a structured concurrency context.
+- **Type-safe API interfaces map directly to REST endpoints.** RentFlow's Node.js/Express.js backend exposes REST APIs with JSON bodies. Retrofit's annotation-based interface (`@GET`, `@POST`, `@Body`) defines each API endpoint as a Kotlin suspend function with typed DTOs. This directly supports the RAS data layer requirement that each feature's `data/` package contains an API service interface.
+- **Coroutine integration is first-class.** Retrofit 3.x (rebase on Kotlin Coroutines) provides suspend function return types and `CallAdapter` for `Response<T>` and `Result<T>`. RentFlow's ViewModels call use cases that call repositories that call Retrofit services — each step is a suspend function in a structured concurrency context.
 - **OkHttp is the standard HTTP engine.** OkHttp's interceptor chain enables JWT token injection, logging, retry, caching, and certificate pinning — all required by the RAS security strategy. Retrofit delegates to OkHttp, so every OkHttp feature is available without additional abstraction.
-- **MockWebServer compatibility.** Integration tests for repositories use OkHttp's MockWebServer to verify API call behavior without a real server. This is critical for testing RentWallet's data layer in CI.
+- **MockWebServer compatibility.** Integration tests for repositories use OkHttp's MockWebServer to verify API call behavior without a real server. This is critical for testing RentFlow's data layer in CI.
 - **Backend compatibility.** The Node.js/Express.js backend speaks standard REST/JSON. Retrofit's serializer-agnostic design (Kotlinx Serialization, Moshi, Gson) adapts to any JSON format the backend produces.
 
 ### 6.6 Trade-offs
@@ -395,7 +395,7 @@ Retrofit is the correct networking layer for RentWallet because:
 
 ### 6.8 Alternatives Rejected
 
-**Ktor Client:** Rejected for Android-only development because Ktor's Android engine (OkHttp-based) adds an abstraction over OkHttp without significant benefit. Ktor's strength is multiplatform — since RentWallet is Android-only, Retrofit's simpler annotation-based API and broader ecosystem are preferable. If iOS becomes a requirement, Ktor Client would replace Retrofit behind the existing repository interfaces.
+**Ktor Client:** Rejected for Android-only development because Ktor's Android engine (OkHttp-based) adds an abstraction over OkHttp without significant benefit. Ktor's strength is multiplatform — since RentFlow is Android-only, Retrofit's simpler annotation-based API and broader ecosystem are preferable. If iOS becomes a requirement, Ktor Client would replace Retrofit behind the existing repository interfaces.
 
 **Volley:** Rejected because Volley is callback-based and does not support Kotlin Coroutines natively. Volley's RequestQueue approach requires either wrapping every call in a coroutine adapter or using callbacks throughout the data layer — both incompatible with the RAS coroutine-first data flow. Additionally, Volley's ecosystem is in decline and does not support modern features like interceptors or type-safe serialization.
 
@@ -436,13 +436,13 @@ Select the underlying HTTP engine that handles connection pooling, interceptors,
 OkHttp is the de facto standard HTTP engine for Android and is the default engine for Retrofit. The choice is straightforward:
 
 - **Retrofit (networking layer) uses OkHttp internally.** Selecting OkHttp is not optional — it is inherent to the Retrofit decision.
-- **Interceptor chain for RentWallet requirements.** OkHttp's interceptor chain enables:
+- **Interceptor chain for RentFlow requirements.** OkHttp's interceptor chain enables:
   - **Auth interceptor:** Every request (except auth endpoints) gets a `Bearer <token>` header injected from the auth repository.
   - **Logging interceptor:** Debug-level logging of request/response bodies for development.
   - **Header interceptor:** Content-Type, Accept-Language, and correlation ID headers on every request.
   - **Retry interceptor:** Automatic retry on timeout or 5xx errors for idempotent requests.
 - **Certificate pinning:** OkHttp's `CertificatePinner` supports the RAS security strategy requirement for certificate pinning in production.
-- **Connection pooling:** Reuses connections across API calls, reducing latency for RentWallet's frequent API calls (dashboard refresh, payment list, notification polling).
+- **Connection pooling:** Reuses connections across API calls, reducing latency for RentFlow's frequent API calls (dashboard refresh, payment list, notification polling).
 
 ### 7.6 Trade-offs
 
@@ -500,18 +500,18 @@ Select the JSON serialization/deserialization library for converting between Kot
 
 ### 8.5 Justification
 
-Kotlinx Serialization is the correct choice for RentWallet because:
+Kotlinx Serialization is the correct choice for RentFlow because:
 
-- **Kotlin-native null safety.** Kotlinx Serialization directly maps Kotlin's nullable types (`String?`, `Int?`) to JSON null/absent fields. Gson does not — it returns default values for missing fields, masking data issues. For RentWallet's payment and lease data, a missing field is a data integrity concern, not a default.
-- **Kotlin default values are respected.** RentWallet's DTOs will evolve as the backend adds fields. Kotlinx Serialization's `@EncodeDefault` and `@Optional` annotations handle backward-compatible API changes without breaking existing code. Gson ignores default values entirely.
+- **Kotlin-native null safety.** Kotlinx Serialization directly maps Kotlin's nullable types (`String?`, `Int?`) to JSON null/absent fields. Gson does not — it returns default values for missing fields, masking data issues. For RentFlow's payment and lease data, a missing field is a data integrity concern, not a default.
+- **Kotlin default values are respected.** RentFlow's DTOs will evolve as the backend adds fields. Kotlinx Serialization's `@EncodeDefault` and `@Optional` annotations handle backward-compatible API changes without breaking existing code. Gson ignores default values entirely.
 - **Compiler plugin, not kapt.** Kotlinx Serialization uses the Kotlin compiler plugin, which is faster and does not require kapt/ksp configuration. This reduces build complexity compared to Moshi's codegen approach.
 - **Compatibility with Retrofit.** Retrofit supports Kotlinx Serialization via the `retrofit2-kotlinx-serialization-converter` converter factory. This is the standard integration path.
-- **Multiplatform-ready.** While RentWallet is Android-only, Kotlinx Serialization's multiplatform capability means serialization logic is portable if the codebase ever moves to Kotlin Multiplatform.
+- **Multiplatform-ready.** While RentFlow is Android-only, Kotlinx Serialization's multiplatform capability means serialization logic is portable if the codebase ever moves to Kotlin Multiplatform.
 
 ### 8.6 Trade-offs
 
 - Kotlinx Serialization requires the `kotlinx-serialization-json` compiler plugin in every module that uses it. Build configuration must include `id("org.jetbrains.kotlin.plugin.serialization")`.
-- Kotlinx Serialization uses `@Serializable` annotations. If RentWallet ever integrates with a library that expects a different format (e.g., MongoDB Realm's BSON), a manual serializer adapter is needed.
+- Kotlinx Serialization uses `@Serializable` annotations. If RentFlow ever integrates with a library that expects a different format (e.g., MongoDB Realm's BSON), a manual serializer adapter is needed.
 - Kotlinx Serialization's serializers are `inline` — they cannot be overridden at runtime. For dynamic serialization scenarios, Moshi's `RuntimeJsonAdapterFactory` is more flexible.
 
 ### 8.7 Long-Term Impact
@@ -564,10 +564,10 @@ Select the local database technology for offline data persistence, caching, and 
 
 ### 9.5 Justification
 
-Room is the correct local database for RentWallet because:
+Room is the correct local database for RentFlow because:
 
 - **First-class Kotlin Coroutines support.** Room DAOs return `Flow<T>` and `suspend` functions natively. This directly supports the RAS data flow: Repository calls DAO → gets `Flow<List<Entity>>` → maps to domain models → ViewModel collects StateFlow from repository. No adapter layer needed.
-- **Compile-time SQL verification.** Room validates SQL queries at compile time. For RentWallet's complex queries (payment history by property, lease status by date, overdue rent calculation), compile-time verification catches SQL errors before they reach production.
+- **Compile-time SQL verification.** Room validates SQL queries at compile time. For RentFlow's complex queries (payment history by property, lease status by date, overdue rent calculation), compile-time verification catches SQL errors before they reach production.
 - **Type-safe migrations.** Room's auto-migration (`@AutoMigration`) handles schema changes automatically. For a SaaS app that will evolve its schema across releases, Room reduces migration bugs significantly compared to raw SQLite.
 - **Integration with the RAS data layer.** Room's Entity/DAO pattern maps directly to the RAS data layer structure: `feature/*/data/local/` contains entities and DAOs. The Repository implementation orchestrates Room (local) and Retrofit (remote) — this is Room's primary design pattern.
 - **Google-maintained.** Room is part of the Android Jetpack suite and is guaranteed to receive long-term maintenance and compatibility with future Android versions.
@@ -643,7 +643,7 @@ Select the storage technology for application preferences, settings, authenticat
 ### 10.6 Trade-offs
 
 - Three storage technologies introduce complexity. Mitigated by strict rules: if it is a preference (boolean, string for settings), use DataStore. If it is a credential (JWT, API key), use EncryptedSharedPreferences. If it is a cryptographic key, use Keystore. No overlap.
-- DataStore's Preference-based API (not Proto) limits schema evolution. For structured preferences (user settings model), Proto DataStore would be used instead of Preferences DataStore. RentWallet's settings are simple key-value pairs initially — Preferences DataStore is sufficient.
+- DataStore's Preference-based API (not Proto) limits schema evolution. For structured preferences (user settings model), Proto DataStore would be used instead of Preferences DataStore. RentFlow's settings are simple key-value pairs initially — Preferences DataStore is sufficient.
 - EncryptedSharedPreferences is still synchronous (blocking on disk + AES-256 decrypt). The JWT token read at app startup may add ~10-20ms. Acceptable — this is a one-time cost.
 
 ### 10.7 Long-Term Impact
@@ -700,7 +700,7 @@ Select the mechanism for executing deferred, periodic, or guaranteed background 
 
 ### 11.5 Justification
 
-- **WorkManager for background processing** because RentWallet will require guaranteed background work:
+- **WorkManager for background processing** because RentFlow will require guaranteed background work:
   - Periodic data sync (refresh property dashboard from backend every 15 minutes).
   - Deferred notification processing (check for new alerts when app is backgrounded).
   - Future: offline payment queue processing (retry failed payment submissions when connectivity is restored).
@@ -763,7 +763,7 @@ Select the image loading library for displaying network images (property photos,
 
 ### 12.5 Justification
 
-Coil is the correct image loading library for RentWallet because:
+Coil is the correct image loading library for RentFlow because:
 
 - **Native Compose integration.** Coil's `AsyncImage` composable handles everything: loading, placeholder, error, and fallback states — without a separate View or wrapper. This directly supports the RAS principle that composables should be self-contained.
 - **Kotlin Coroutines-first.** Coil's entire API is built on coroutines (suspend functions, Flow integration). Coil runs image loading in `Dispatchers.IO` internally, with automatic cancellation when the composable leaves composition. This aligns with the RAS coroutine-first data flow.
@@ -773,7 +773,7 @@ Coil is the correct image loading library for RentWallet because:
 
 ### 12.6 Trade-offs
 
-- Coil's transformation library is smaller than Glide's. For complex image editing (blur, watermark, custom GPU filters), Glide has more options. RentWallet's image needs are basic (circle crop for avatars, thumbnail generation for property photos) — Coil covers these.
+- Coil's transformation library is smaller than Glide's. For complex image editing (blur, watermark, custom GPU filters), Glide has more options. RentFlow's image needs are basic (circle crop for avatars, thumbnail generation for property photos) — Coil covers these.
 - Coil's animated image support is limited to GIF and AnimatedVectorDrawable. Glide also supports Video frames and WebP animations.
 - Coil's community is smaller than Glide's, but it is the officially recommended Compose image library.
 
@@ -789,7 +789,7 @@ Coil is the correct image loading library for RentWallet because:
 
 ### 12.8 Alternatives Rejected
 
-**Glide:** Rejected because Glide's Java-based API requires adapter layers for Compose (GlideImage). While Glide's performance (BitmapPool, recycling) is excellent, Coil provides equivalent performance for RentWallet's use case (primarily JPEG/PNG property photos) with a more idiomatic Kotlin/Compose API. Glide's ~500KB APK size is also significantly larger than Coil's ~150KB.
+**Glide:** Rejected because Glide's Java-based API requires adapter layers for Compose (GlideImage). While Glide's performance (BitmapPool, recycling) is excellent, Coil provides equivalent performance for RentFlow's use case (primarily JPEG/PNG property photos) with a more idiomatic Kotlin/Compose API. Glide's ~500KB APK size is also significantly larger than Coil's ~150KB.
 
 **Picasso:** Rejected because Picasso is in maintenance mode (no active development) and lacks Compose integration. Picasso's smaller default cache size and lack of coroutine support make it unsuitable for a modern Compose application.
 
@@ -827,7 +827,7 @@ Select the navigation framework for managing screen transitions, backstack handl
 
 ### 13.5 Justification
 
-Navigation Compose is the correct choice for RentWallet because:
+Navigation Compose is the correct choice for RentFlow because:
 
 - **Direct mapping to the RAS navigation philosophy (section 10).** The RAS defines: Route sealed class, 4-graph hierarchy, auth guard, deep links. Navigation Compose provides:
   - `NavHost` with route composition (matching the RAS graph structure).
@@ -897,7 +897,7 @@ Select the logging strategy and library for development debugging, production mo
   - Plant architecture allows different logging configurations for debug (logcat) and release (Crashlytics).
   - Debug-only logs are automatically stripped in release builds when using the release tree.
   - The `@DebugLog` annotation in Timber can log function entry/exit with parameters — useful for debugging complex payment and lease flows.
-- **Structured logging for production** because RentWallet handles financial transactions (payment processing, lease agreements). For audit compliance and debugging production issues, structured logs (JSON format with timestamps, correlation IDs, feature context) are more useful than plain text logcat output. A `StructuredLogTree` can format logs as JSON and write them to a log file or send them to a remote logging service.
+- **Structured logging for production** because RentFlow handles financial transactions (payment processing, lease agreements). For audit compliance and debugging production issues, structured logs (JSON format with timestamps, correlation IDs, feature context) are more useful than plain text logcat output. A `StructuredLogTree` can format logs as JSON and write them to a log file or send them to a remote logging service.
 
 ### 14.6 Trade-offs
 
@@ -1099,8 +1099,8 @@ Define the strategy for managing build configurations, environment-specific valu
 | Variant | API Base URL | Logging | Crash Reporting | SSL |
 |---------|-------------|---------|-----------------|-----|
 | **debug** | `http://10.0.2.2:3000` (emulator) | Timber (all logs) | Disabled | None (HTTP local) |
-| **staging** | `https://staging-api.rentwallet.com` | Timber (info+) | Enabled (debug mode) | Production SSL |
-| **release** | `https://api.rentwallet.com` | Structured logs only | Enabled (production) | SSL + Certificate Pinning |
+| **staging** | `https://staging-api.rentflow.com` | Timber (info+) | Enabled (debug mode) | Production SSL |
+| **release** | `https://api.rentflow.com` | Structured logs only | Enabled (production) | SSL + Certificate Pinning |
 
 ### Secrets Management
 
@@ -1361,7 +1361,7 @@ Define the security strategy covering authentication tokens, network security, a
 |---------|-----------|----------------|
 | JWT Storage | **EncryptedSharedPreferences** | AES-256 encrypted storage via Android Security Crypto library. |
 | Token Refresh | **AuthRepository (interceptor)** | OkHttp interceptor catches 401 → calls refresh token API → retries original request. |
-| Certificate Pinning | **OkHttp CertificatePinner** | Production-only. Pin the RentWallet backend certificate hash. |
+| Certificate Pinning | **OkHttp CertificatePinner** | Production-only. Pin the RentFlow backend certificate hash. |
 | Network Security Config | **network_security_config.xml** | Debug: allow cleartext to localhost. Release: HTTPS-only, certificate pinning. |
 | Root Detection | **RootBeer (future)** | Runtime check for rooted devices. Optional — no hard enforcement initially. |
 | Biometric Auth | **Android Biometric API (future)** | `BiometricPrompt` for payment confirmation and lease signing. |
@@ -1387,7 +1387,7 @@ On refresh failure: Clear tokens → navigate to Login screen
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.rentwallet.com</domain>
+        <domain includeSubdomains="true">api.rentflow.com</domain>
         <pin-set expiration="2027-01-01">
             <pin digest="SHA-256">BACKEND_CERT_HASH_1</pin>
             <pin digest="SHA-256">BACKEND_CERT_HASH_2</pin>
@@ -1400,7 +1400,7 @@ On refresh failure: Clear tokens → navigate to Login screen
 
 - **EncryptedSharedPreferences for JWT storage** is the standard, simplest approach for encrypting small credential data at rest. No additional encryption library is needed.
 - **OkHttp interceptor for token refresh** automates token lifecycle without any ViewModel or Composable awareness. The interceptor transparently handles 401 responses and retries.
-- **Certificate pinning** prevents man-in-the-middle attacks against the RentWallet API. Production-only to avoid pinning issues during development.
+- **Certificate pinning** prevents man-in-the-middle attacks against the RentFlow API. Production-only to avoid pinning issues during development.
 - **RootBeer** is a future, optional check. The app should still function on rooted devices (no hard block), but may display a warning for compliance.
 
 ### 21.6 Trade-offs
@@ -1654,7 +1654,7 @@ Recommend the CI/CD practices, tools, and configurations for automated building,
 
 ## Technology Decision Summary
 
-### The RentWallet Android Stack
+### The RentFlow Android Stack
 
 **Kotlin** powers every line of the application — from the **Jetpack Compose** UI layer through **ViewModel** presentation logic, **Use Case** business rules, and **Repository** data orchestration. State flows reactively from Room and Retrofit through **StateFlow** channels, where **Turbine** tests verify every emission.
 
@@ -1662,9 +1662,9 @@ Recommend the CI/CD practices, tools, and configurations for automated building,
 
 **Timber** helps developers debug. **Firebase** monitors production. **Detekt** and **Spotless** enforce code quality in **GitHub Actions**, which runs the full testing pyramid — **JUnit 5**, **MockK**, **Turbine**, **Compose UI Test**, **Robolectric** — on every pull request.
 
-### Why This Stack Wins for RentWallet
+### Why This Stack Wins for RentFlow
 
-Every technology in this stack was evaluated against what RentWallet specifically needs: a production-grade, long-lived, multi-feature SaaS application with offline capability, future AI integration, and a team that will grow.
+Every technology in this stack was evaluated against what RentFlow specifically needs: a production-grade, long-lived, multi-feature SaaS application with offline capability, future AI integration, and a team that will grow.
 
 The stack avoids fads. Every choice is backed by at least one of:
 - **Google Jetpack endorsement** (Room, Hilt, Navigation Compose, WorkManager, DataStore)
@@ -1677,10 +1677,10 @@ The stack is **replaceable where it matters, and stable where it doesn't**. Room
 
 The stack **scales from 5 features to 50** without architectural change. Each feature gets the same ingredients: a composable, a ViewModel with StateFlow, one or more Use Cases, a Repository interface, and data sources. The recipe never changes.
 
-This is the foundation on which RentWallet will be built for the next 3-5 years.
+This is the foundation on which RentFlow will be built for the next 3-5 years.
 
 ---
 
-*End of RentWallet Android — Technology Decision Record (TDR v1.0)*
+*End of RentFlow Android — Technology Decision Record (TDR v1.0)*
 *This document contains no implementation code, no build configurations, and no migration instructions.*
-*It is the official technology reference for the RentWallet Android project.*
+*It is the official technology reference for the RentFlow Android project.*
