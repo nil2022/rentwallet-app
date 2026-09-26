@@ -1,193 +1,72 @@
 package com.thebackendguy.myandroidtestapp.ui.theme
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-val LightPrimary = Color(0xFF005050)
-val LightOnPrimary = Color(0xFFFFFFFF)
-val LightPrimaryContainer = Color(0xFF006A6A)
-val LightOnPrimaryContainer = Color(0xFF97E7E6)
-val LightSecondary = Color(0xFF7D5800)
-val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFFFDCA6F)
-val LightOnSecondaryContainer = Color(0xFF775300)
-val LightTertiary = Color(0xFF70371A)
-val LightOnTertiary = Color(0xFFFFFFFF)
-val LightTertiaryContainer = Color(0xFF8D4E2F)
-val LightOnTertiaryContainer = Color(0xFFFFCFBA)
-val LightError = Color(0xFFBA1A1A)
-val LightOnError = Color(0xFFFFFFFF)
-val LightErrorContainer = Color(0xFFFFDAD6)
-val LightOnErrorContainer = Color(0xFF93000A)
-val LightBackground = Color(0xFFFBF9F8)
-val LightOnBackground = Color(0xFF1B1C1C)
-val LightSurface = Color(0xFFFDFBFF)
-val LightOnSurface = Color(0xFF1B1C1C)
-val LightSurfaceVariant = Color(0xFFE4E2E2)
-val LightOnSurfaceVariant = Color(0xFF3E4948)
-val LightOutline = Color(0xFF79747E)
-val LightOutlineVariant = Color(0xFFBEC9C8)
-val LightInverseSurface = Color(0xFF303030)
-val LightInverseOnSurface = Color(0xFFF2F0F0)
-val LightInversePrimary = Color(0xFF84D4D3)
-val LightSurfaceTint = Color(0xFF006A6A)
-val LightSurfaceDim = Color(0xFFDBDAD9)
-val LightSurfaceBright = Color(0xFFFEF7FF)
-val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
-val LightSurfaceContainerLow = Color(0xFFF5F3F3)
-val LightSurfaceContainer = Color(0xFFF3EDF7)
-val LightSurfaceContainerHigh = Color(0xFFE9E8E7)
-val LightSurfaceContainerHighest = Color(0xFFE4E2E2)
+/**
+ * RentFlow palette, taken 1:1 from the web app's phone design
+ * (rent-management-ui: dashMobileTokens.js, authMobileTokens.js, mobileTokens.js).
+ * The app is light-only, so these are used directly.
+ */
+object Rf {
+    // Material 3 roles
+    val Primary = Color(0xFF3525CD)
+    val PrimaryContainer = Color(0xFF4F46E5)
+    val OnPrimary = Color(0xFFFFFFFF)
+    val PrimaryFixed = Color(0xFFE2DFFF)
+    val Secondary = Color(0xFF006C4A)
+    val SecondaryContainer = Color(0xFF82F5C1)
+    val OnSecondaryContainer = Color(0xFF00714E)
+    val Surface = Color(0xFFF8F9FF)
+    val Lowest = Color(0xFFFFFFFF)
+    val Low = Color(0xFFEFF4FF)
+    val Container = Color(0xFFE5EEFF)
+    val High = Color(0xFFDCE9FF)
+    val Highest = Color(0xFFD3E4FE)
+    val OnSurface = Color(0xFF0B1C30)
+    val OnSurfaceVariant = Color(0xFF464555)
+    val Outline = Color(0xFF777587)
+    val OutlineVariant = Color(0xFFC7C4D8)
+    val Error = Color(0xFFBA1A1A)
+    val ErrorContainer = Color(0xFFFFDAD6)
+    val OnErrorContainer = Color(0xFF93000A)
+    val Tertiary = Color(0xFF950029)
+    val InverseSurface = Color(0xFF213145)
+    val InverseOnSurface = Color(0xFFEAF1FF)
+    val Amber = Color(0xFFD97706)
 
-val DarkPrimary = Color(0xFF84D4D3)
-val DarkOnPrimary = Color(0xFF003D3D)
-val DarkPrimaryContainer = Color(0xFF004F4F)
-val DarkOnPrimaryContainer = Color(0xFFA0F0F0)
-val DarkSecondary = Color(0xFFF0BF65)
-val DarkOnSecondary = Color(0xFF3E2B00)
-val DarkSecondaryContainer = Color(0xFF5E4200)
-val DarkOnSecondaryContainer = Color(0xFFFFDEA9)
-val DarkTertiary = Color(0xFFFFB694)
-val DarkOnTertiary = Color(0xFF4A1F07)
-val DarkTertiaryContainer = Color(0xFF70371A)
-val DarkOnTertiaryContainer = Color(0xFFFFDBCC)
-val DarkError = Color(0xFFFFB4AB)
-val DarkOnError = Color(0xFF690005)
-val DarkErrorContainer = Color(0xFF93000A)
-val DarkOnErrorContainer = Color(0xFFFFDAD6)
-val DarkBackground = Color(0xFF141218)
-val DarkOnBackground = Color(0xFFE6E1E5)
-val DarkSurface = Color(0xFF1D1B20)
-val DarkOnSurface = Color(0xFFE6E1E5)
-val DarkSurfaceVariant = Color(0xFF49454F)
-val DarkOnSurfaceVariant = Color(0xFFCAC4D0)
-val DarkOutline = Color(0xFF938F99)
-val DarkOutlineVariant = Color(0xFF49454F)
-val DarkInverseSurface = Color(0xFFE6E1E5)
-val DarkInverseOnSurface = Color(0xFF313033)
-val DarkInversePrimary = Color(0xFF006A6A)
-val DarkSurfaceTint = Color(0xFF84D4D3)
-val DarkSurfaceDim = Color(0xFF141218)
-val DarkSurfaceBright = Color(0xFF3B383E)
-val DarkSurfaceContainerLowest = Color(0xFF0F0D13)
-val DarkSurfaceContainerLow = Color(0xFF1D1B20)
-val DarkSurfaceContainer = Color(0xFF211F26)
-val DarkSurfaceContainerHigh = Color(0xFF2B2930)
-val DarkSurfaceContainerHighest = Color(0xFF36343B)
+    // Logo tile (web Home page header)
+    val Logo = Color(0xFF4F46E5)
 
-val TenantPrimary = Color(0xFF006A6A)
-val TenantOnPrimary = Color(0xFFFFFFFF)
-val TenantContainer = Color(0xFF6FF5F5)
+    // Tints used on the dark cards and in badges
+    val Mint = Color(0xFF85F8C4)
+    val MintSoft = Color(0x6682F5C1)      // secondaryContainer at 40%
+    val MintWash = Color(0x4082F5C1)      // secondaryContainer at 25%
+    val ErrorSoft = Color(0x66FFDAD6)     // errorContainer at 40%
+    val ErrorWash = Color(0x33FFDAD6)     // errorContainer at 20%
+    val Rose = Color(0xFFFFDADA)
+    val AmberText = Color(0xFFFDE68A)
+    val AmberDot = Color(0xFFFBBF24)
+    val AmberSoft = Color(0xFFFEF3C7)
+    val Online = Color(0xFF22C55E)
+    val PinFilled = Color(0xFFDFE5FB)
+    val PinReady = Color(0xFF0F9D6A)
 
-val LandlordPrimary = Color(0xFF7D5800)
-val LandlordOnPrimary = Color(0xFFFFFFFF)
-val LandlordContainer = Color(0xFFFFDDA1)
+    // Welcome screen (the web's landing page)
+    val Midnight = Color(0xFF0B192C)
+    val MidnightVia = Color(0xFF0E213B)
+    val Slate50 = Color(0xFFF8FAFC)
+    val Slate200 = Color(0xFFE2E8F0)
+    val Slate300 = Color(0xFFCBD5E1)
+    val Slate400 = Color(0xFF94A3B8)
+    val Slate500 = Color(0xFF64748B)
+    val Slate600 = Color(0xFF475569)
+    val Slate700 = Color(0xFF334155)
+    val Slate800 = Color(0xFF1E293B)
+    val Slate900 = Color(0xFF0F172A)
+    val Emerald400 = Color(0xFF34D399)
+    val Emerald500 = Color(0xFF10B981)
+    val Indigo400 = Color(0xFF818CF8)
 
-val Success = Color(0xFF006D3A)
-val OnSuccess = Color(0xFFFFFFFF)
-val SuccessContainer = Color(0xFF96F7B4)
-
-val Warning = Color(0xFF8B5000)
-val OnWarning = Color(0xFFFFFFFF)
-val WarningContainer = Color(0xFFFFDCC0)
-
-val Info = Color(0xFF0061A4)
-val OnInfo = Color(0xFFFFFFFF)
-val InfoContainer = Color(0xFFD1E4FF)
-
-val PositiveCash = Color(0xFF006D3A)
-val NegativeCash = Color(0xFFBA1A1A)
-
-val Chart1 = Color(0xFF006A6A)
-val Chart2 = Color(0xFF7D5800)
-val Chart3 = Color(0xFF0061A4)
-val Chart4 = Color(0xFF6750A4)
-val Chart5 = Color(0xFF984061)
-val Chart6 = Color(0xFF006D3A)
-
-data class RentWalletColors(
-    val tenantPrimary: Color,
-    val tenantOnPrimary: Color,
-    val tenantContainer: Color,
-    val landlordPrimary: Color,
-    val landlordOnPrimary: Color,
-    val landlordContainer: Color,
-    val success: Color,
-    val onSuccess: Color,
-    val successContainer: Color,
-    val warning: Color,
-    val onWarning: Color,
-    val warningContainer: Color,
-    val info: Color,
-    val onInfo: Color,
-    val infoContainer: Color,
-    val positiveCash: Color,
-    val negativeCash: Color,
-    val chart1: Color,
-    val chart2: Color,
-    val chart3: Color,
-    val chart4: Color,
-    val chart5: Color,
-    val chart6: Color,
-)
-
-val LightRentWalletColors = RentWalletColors(
-    tenantPrimary = TenantPrimary,
-    tenantOnPrimary = TenantOnPrimary,
-    tenantContainer = TenantContainer,
-    landlordPrimary = LandlordPrimary,
-    landlordOnPrimary = LandlordOnPrimary,
-    landlordContainer = LandlordContainer,
-    success = Success,
-    onSuccess = OnSuccess,
-    successContainer = SuccessContainer,
-    warning = Warning,
-    onWarning = OnWarning,
-    warningContainer = WarningContainer,
-    info = Info,
-    onInfo = OnInfo,
-    infoContainer = InfoContainer,
-    positiveCash = PositiveCash,
-    negativeCash = NegativeCash,
-    chart1 = Chart1,
-    chart2 = Chart2,
-    chart3 = Chart3,
-    chart4 = Chart4,
-    chart5 = Chart5,
-    chart6 = Chart6,
-)
-
-val DarkRentWalletColors = RentWalletColors(
-    tenantPrimary = Color(0xFF84D4D3),
-    tenantOnPrimary = Color(0xFF003D3D),
-    tenantContainer = Color(0xFF004F4F),
-    landlordPrimary = Color(0xFFF0BF65),
-    landlordOnPrimary = Color(0xFF3E2B00),
-    landlordContainer = Color(0xFF5E4200),
-    success = Color(0xFF5EDB83),
-    onSuccess = Color(0xFF003919),
-    successContainer = Color(0xFF00522A),
-    warning = Color(0xFFFFB76B),
-    onWarning = Color(0xFF4A2800),
-    warningContainer = Color(0xFF6B3C00),
-    info = Color(0xFF9ACAFF),
-    onInfo = Color(0xFF003450),
-    infoContainer = Color(0xFF004A72),
-    positiveCash = Color(0xFF5EDB83),
-    negativeCash = Color(0xFFFFB4AB),
-    chart1 = Color(0xFF84D4D3),
-    chart2 = Color(0xFFF0BF65),
-    chart3 = Color(0xFF9ACAFF),
-    chart4 = Color(0xFFCFBCFF),
-    chart5 = Color(0xFFFF9DBF),
-    chart6 = Color(0xFF5EDB83),
-)
-
-val LocalRentWalletColors = staticCompositionLocalOf {
-    LightRentWalletColors
+    // Soft shadow the web puts on every card: 0 1px 2px rgba(11,28,48,.06)
+    val Shadow = Color(0x290B1C30)
 }
-
-val MaterialTheme.rentWalletColors: RentWalletColors
-    @Composable get() = LocalRentWalletColors.current

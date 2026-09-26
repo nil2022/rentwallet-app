@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lucide "house" icon (ISC License), the RentFlow logo mark. The 24-unit icon is
+  scaled to 36dp and centred, so it sits at half the visible tile like the web logo.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.5"
+        android:scaleY="1.5"
+        android:translateX="36"
+        android:translateY="36">
+        <path
+            android:pathData="M15,21v-8a1,1 0,0 0,-1 -1h-4a1,1 0,0 0,-1 1v8"
+            android:strokeWidth="2"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M3,10a2,2 0,0 1,0.709 -1.528l7,-5.999a2,2 0,0 1,2.582 0l7,5.999A2,2 0,0 1,21 10v9a2,2 0,0 1,-2 2H5a2,2 0,0 1,-2 -2z"
+            android:strokeWidth="2"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>
