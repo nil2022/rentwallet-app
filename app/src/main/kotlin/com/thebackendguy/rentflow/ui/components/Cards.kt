@@ -33,7 +33,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.icons.LucideIcon
@@ -114,51 +113,6 @@ fun DarkMetric(label: String, value: String, side: String? = null, sideColor: Co
     }
 }
 
-/** Collected-vs-pending bar with its legend. */
-@Composable
-fun DarkProgress(fraction: Float, left: String, right: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        GrowBar(fraction = fraction, color = Rf.Mint, track = Color.White.copy(alpha = 0.15f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Dot(Rf.Mint, size = 8.dp)
-                Text(text = left, style = RfType.LabelSm, color = soft(0.8f))
-            }
-            Text(text = right, style = RfType.LabelSm, color = soft(0.6f))
-        }
-    }
-}
-
-/** Small translucent tile on the dark card ("₹37,000 pending / 2 tenants late"). */
-@Composable
-fun DarkStat(
-    icon: LucideIcon,
-    main: String,
-    sub: String,
-    tone: Color,
-    toneBg: Color,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null
-) {
-    Row(
-        modifier = modifier
-            .pressable(onClick, pressScale = 0.97f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.1f))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(Modifier.size(24.dp).clip(CircleShape).background(toneBg), contentAlignment = Alignment.Center) {
-            LIcon(icon, size = 15.dp, tint = tone)
-        }
-        Column {
-            Text(text = main, style = RfType.LabelSm, color = tone, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(text = sub, style = RfType.LabelSm.copy(fontSize = 10.sp), color = soft(0.6f), maxLines = 1)
-        }
-    }
-}
-
 /* ------------------------------ Info and alert cards ------------------------------ */
 
 /** Tinted note with an icon (the web's InfoCard). */
@@ -236,7 +190,7 @@ fun HealthTiles(tiles: List<HealthTileSpec>) {
     Grid2(tiles) { spec, cellModifier -> HealthTile(spec, cellModifier) }
 }
 
-/* ------------------------------ Ledger and attention cards ------------------------------ */
+/* ------------------------------ Ledger cards ------------------------------ */
 
 enum class LedgerTone { Settled, Due, Late }
 
@@ -303,44 +257,6 @@ fun LedgerCard(
                 if (whenText != null) Text(text = whenText, style = RfType.LabelSm, color = Rf.Outline)
             }
         }
-    }
-}
-
-/** Card for one tenant who needs follow-up (the web's UrgentActions cards). */
-@Composable
-fun AttentionCard(
-    initials: String,
-    name: String,
-    sub: String,
-    pill: String,
-    pillBg: Color,
-    pillFg: Color,
-    avatarBg: Color,
-    avatarFg: Color,
-    amount: String,
-    amountColor: Color,
-    actions: @Composable ColumnScope.() -> Unit
-) {
-    RfCard(spacing = 12.dp) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Avatar(initials, background = avatarBg, content = avatarFg, size = 40.dp, style = RfType.HeadlineSm)
-                Column {
-                    Text(text = name, style = RfType.BodyLg.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = sub, style = RfType.LabelSm, color = Rf.OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Pill(pill, background = pillBg, content = pillFg)
-        }
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Rf.Low).padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = "Pending amount", style = RfType.LabelMd, color = Rf.OnSurfaceVariant)
-            Text(text = amount, style = RfType.HeadlineSm.copy(fontWeight = FontWeight.Bold), color = amountColor)
-        }
-        actions()
     }
 }
 

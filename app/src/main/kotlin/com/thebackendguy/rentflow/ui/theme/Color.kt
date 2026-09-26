@@ -174,6 +174,7 @@ object Rf {
 
     // Same in both themes: the brand indigo and the dark cards
     val PrimaryContainer = Color(0xFF4F46E5)
+    val TertiaryContainer = Color(0xFFC20038)
     val InverseSurface = Color(0xFF213145)
     val InverseOnSurface = Color(0xFFEAF1FF)
 

@@ -50,7 +50,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 09 Overview | 10 Tenants | 11 Tenant Details | 12 Profile |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/09-landlord-overview.png" width="170" alt="Landlord overview"> | <img src="docs/screenshots/10-tenants.png" width="170" alt="Tenants"> | <img src="docs/screenshots/11-tenant-details.png" width="170" alt="Tenant details"> | <img src="docs/screenshots/12-landlord-profile.png" width="170" alt="Landlord profile"> |
-| Portfolio health counts real properties, tenants, vacant rooms and leases ending soon. Add property and Add tenant are one tap away. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | Contact details and the full lease. Call, edit, end the lease or delete the tenant. | Real owner details and counts. Edit profile and change password. |
+| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | Contact details and the full lease. Call, edit, end the lease or delete the tenant. | Real owner details and counts. Edit profile and change password. |
 
 ### Properties and rooms
 
@@ -161,7 +161,7 @@ How navigation works:
 | Screen | From the API | Sample data |
 |---|---|---|
 | Login, OTP, Forgot password, Register | Everything | None |
-| Landlord Overview | Property, tenant and vacant-room counts, leases ending soon | Collections card, needs-attention cards, payment ledger |
+| Landlord Overview | Property, tenant and vacant-room counts, leases ending soon, the first three property cards | Payment ledger, sub-meter card |
 | Properties, property details, rooms | Everything: list, details, add, edit, delete, photos | None |
 | Tenants, tenant details | Names, contacts, rooms, leases. Add, edit, delete, assign a room, end a lease | Paid / Due badges, rent status, tenant alerts, Send reminder |
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |

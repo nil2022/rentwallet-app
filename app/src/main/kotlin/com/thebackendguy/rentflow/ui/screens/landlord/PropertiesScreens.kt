@@ -114,8 +114,9 @@ fun PropertiesScreen(shell: Shell, onOpenProperty: (String) -> Unit, onAddProper
     }
 }
 
+/** A property with its cover photo, type, vacancy and how many rooms are let; also on the overview. */
 @Composable
-private fun PropertyCard(property: PropertyDto, portfolio: Portfolio, onClick: () -> Unit) {
+internal fun PropertyCard(property: PropertyDto, portfolio: Portfolio, onClick: () -> Unit) {
     val rooms = portfolio.roomsOf(property.id)
     val let = rooms.count { portfolio.occupants(it.id).isNotEmpty() }
     val full = rooms.isNotEmpty() && let == rooms.size

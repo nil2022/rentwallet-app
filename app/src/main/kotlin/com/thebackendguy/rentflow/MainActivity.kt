@@ -339,6 +339,8 @@ private fun RentFlowApp() {
                             tenants = Demo.tenants,
                             shell = shell,
                             onOpenTenants = { openTab(Screen.Tenants) },
+                            onOpenProperties = { openTab(Screen.Properties) },
+                            onOpenProperty = { go(Screen.PropertyDetails, it) },
                             onAddProperty = { go(Screen.PropertyForm) },
                             onAddTenant = { go(Screen.AddTenant) }
                         )
