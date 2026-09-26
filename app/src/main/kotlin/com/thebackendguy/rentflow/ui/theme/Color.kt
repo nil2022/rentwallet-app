@@ -44,6 +44,8 @@ class RfPalette(
     val amberSoft: Color,
     val sheen: Color,
     val sweep: Color,
+    val pinFilled: Color,
+    val pinReady: Color,
     val shadow: Color
 )
 
@@ -79,6 +81,8 @@ val LightPalette = RfPalette(
     amberSoft = Color(0xFFFEF3C7),
     sheen = Color(0x99FFFFFF),         // the light band over loading photos
     sweep = Color(0xB3FFFFFF),         // Stitch's sweep over loading placeholders
+    pinFilled = Color(0xFFDFE5FB),     // a filled box of a sign-in code
+    pinReady = Color(0xFF0F9D6A),      // "code complete" on the sign-up check
     shadow = Color(0x290B1C30)         // 0 1px 2px rgba(11,28,48,.06)
 )
 
@@ -114,6 +118,8 @@ val DarkPalette = RfPalette(
     amberSoft = Color(0xFF3D3320),
     sheen = Color(0x1CFFFFFF),         // kept faint so it doesn't glare in the dark
     sweep = Color(0x1FFFFFFF),
+    pinFilled = Color(0xFF2A3D5C),
+    pinReady = Color(0xFF68DBA9),
     shadow = Color(0x4D000000)         // 0 1px 2px rgba(0,0,0,.3)
 )
 
@@ -121,7 +127,7 @@ val LocalRfPalette = staticCompositionLocalOf { LightPalette }
 
 /**
  * RentFlow colours. The Material 3 roles follow the current theme (see
- * [RentFlowTheme]); the brand, welcome-screen and dark-card colours are the
+ * [RentFlowTheme]); the brand and dark-card colours are the
  * same in both.
  */
 object Rf {
@@ -160,6 +166,9 @@ object Rf {
     val Sheen: Color @Composable @ReadOnlyComposable get() = LocalRfPalette.current.sheen
     /** The band that slides over loading placeholders and avatars (Stitch's Wave Sweep). */
     val Sweep: Color @Composable @ReadOnlyComposable get() = LocalRfPalette.current.sweep
+    /** A filled box of a sign-in code, and the "code complete" green. */
+    val PinFilled: Color @Composable @ReadOnlyComposable get() = LocalRfPalette.current.pinFilled
+    val PinReady: Color @Composable @ReadOnlyComposable get() = LocalRfPalette.current.pinReady
     /** Soft shadow the web puts on every card. */
     val Shadow: Color @Composable @ReadOnlyComposable get() = LocalRfPalette.current.shadow
 
@@ -177,22 +186,4 @@ object Rf {
     val AmberText = Color(0xFFFDE68A)
     val AmberDot = Color(0xFFFBBF24)
     val Online = Color(0xFF22C55E)
-    val PinFilled = Color(0xFFDFE5FB)
-    val PinReady = Color(0xFF0F9D6A)
-
-    // Welcome screen (the web's landing page)
-    val Midnight = Color(0xFF0B192C)
-    val MidnightVia = Color(0xFF0E213B)
-    val Slate50 = Color(0xFFF8FAFC)
-    val Slate200 = Color(0xFFE2E8F0)
-    val Slate300 = Color(0xFFCBD5E1)
-    val Slate400 = Color(0xFF94A3B8)
-    val Slate500 = Color(0xFF64748B)
-    val Slate600 = Color(0xFF475569)
-    val Slate700 = Color(0xFF334155)
-    val Slate800 = Color(0xFF1E293B)
-    val Slate900 = Color(0xFF0F172A)
-    val Emerald400 = Color(0xFF34D399)
-    val Emerald500 = Color(0xFF10B981)
-    val Indigo400 = Color(0xFF818CF8)
 }

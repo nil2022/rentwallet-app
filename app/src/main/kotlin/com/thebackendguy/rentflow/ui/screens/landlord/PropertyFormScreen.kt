@@ -28,6 +28,7 @@ import com.thebackendguy.rentflow.ui.components.CountStepper
 import com.thebackendguy.rentflow.ui.components.FormBar
 import com.thebackendguy.rentflow.ui.components.FormSection
 import com.thebackendguy.rentflow.ui.components.PhotoGrid
+import com.thebackendguy.rentflow.ui.components.PhotoListSaver
 import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.RowDivider
 import com.thebackendguy.rentflow.ui.components.SwitchRow
@@ -71,7 +72,9 @@ private fun PropertyForm(existing: PropertyDto?, shell: Shell, onBack: () -> Uni
     var parking by rememberSaveable { mutableStateOf(existing?.hasParking ?: false) }
     var lift by rememberSaveable { mutableStateOf(existing?.hasLift ?: false) }
     var description by rememberSaveable { mutableStateOf(existing?.description.orEmpty()) }
-    var photos by remember { mutableStateOf<List<Photo>>(existing?.images.orEmpty().map { Photo.Stored(it.key, it.url) }) }
+    var photos by rememberSaveable(stateSaver = PhotoListSaver) {
+        mutableStateOf<List<Photo>>(existing?.images.orEmpty().map { Photo.Stored(it.key, it.url) })
+    }
     var submitted by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
 

@@ -64,6 +64,7 @@ import com.thebackendguy.rentflow.ui.components.IconDetail
 import com.thebackendguy.rentflow.ui.components.IconRows
 import com.thebackendguy.rentflow.ui.components.IconTile
 import com.thebackendguy.rentflow.ui.components.PersonAvatar
+import com.thebackendguy.rentflow.ui.components.PhotoViewer
 import com.thebackendguy.rentflow.ui.components.Pill
 import com.thebackendguy.rentflow.ui.components.PrimaryButton
 import com.thebackendguy.rentflow.ui.components.RfCard
@@ -491,10 +492,19 @@ private fun EditTenantForm(tenant: TenantDto, shell: Shell, onBack: () -> Unit, 
     }
 }
 
-/** Round photo with a camera button; shows [name]'s initials when there's no photo. */
+/**
+ * Round photo with a camera button; shows [name]'s initials when there's no
+ * photo. Tapping it offers to view, take, choose (then crop round) or remove.
+ */
 @Composable
 internal fun AvatarPicker(name: String, photo: Any?, onPick: (Uri) -> Unit, onRemove: (() -> Unit)?) {
-    val open = photoChooser { uris -> onPick(uris.first()) }
+    var viewing by remember { mutableStateOf(false) }
+    val open = photoChooser(
+        round = true,
+        title = "Profile photo",
+        onView = if (photo != null) ({ viewing = true }) else null,
+        onRemove = if (photo != null) onRemove else null
+    ) { uris -> onPick(uris.first()) }
     // The saved photo's download, so a failed one can say so next to the text
     val load = rememberPhotoLoad(photo as? String)
     RfCard {
@@ -525,13 +535,11 @@ internal fun AvatarPicker(name: String, photo: Any?, onPick: (Uri) -> Unit, onRe
                         Text("Photo didn’t load · Retry", style = RfType.LabelMd, color = Rf.Error)
                     }
                 }
-                if (photo != null && onRemove != null) {
-                    Row(Modifier.pressable(onRemove), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        LIcon(Lucide.X, size = 14.dp, tint = Rf.Error)
-                        Text("Remove photo", style = RfType.LabelMd, color = Rf.Error)
-                    }
-                }
             }
         }
+    }
+    if (viewing && photo != null) {
+        val shown = if (photo is Uri) Photo.Picked(photo) else Photo.Stored("", photo.toString())
+        PhotoViewer(listOf(shown), 0, onClose = { viewing = false })
     }
 }

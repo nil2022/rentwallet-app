@@ -305,13 +305,14 @@ fun AppPage(
 }
 
 /**
- * Frame for login, forgot password and registration: back button and brand
- * lockup on top, footer links at the bottom (the web's MobileAuthShell).
+ * Frame for login, forgot password and registration: back button (none when
+ * [onBack] is null, as on Login, where the app opens), brand lockup and the
+ * theme button on top, footer links at the bottom (the web's MobileAuthShell).
  * [error] floats up from the bottom until [onDismissError] clears it.
  */
 @Composable
 fun AuthShell(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     error: String? = null,
     onDismissError: () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit
@@ -333,18 +334,25 @@ fun AuthShell(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Row(
-                    Modifier.padding(bottom = 16.dp),
+                    Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val shape = RoundedCornerShape(12.dp)
-                    Box(
-                        Modifier.size(44.dp).pressable(onBack).softShadow(shape).clip(shape).background(Rf.Low),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LIcon(Lucide.ArrowLeft, size = 24.dp, tint = Rf.OnSurface, strokeWidth = 1.75f, contentDescription = "Go back")
+                    if (onBack != null) {
+                        val shape = RoundedCornerShape(12.dp)
+                        Box(
+                            Modifier.size(44.dp).pressable(onBack).softShadow(shape).clip(shape).background(Rf.Low),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            LIcon(Lucide.ArrowLeft, size = 24.dp, tint = Rf.OnSurface, strokeWidth = 1.75f, contentDescription = "Go back")
+                        }
                     }
-                    BrandLockup(color = Rf.OnSurface, logoSize = 30.dp, fontSize = 22.sp, gap = 8.dp, modifier = Modifier.padding(start = 4.dp))
+                    BrandLockup(
+                        color = Rf.OnSurface, logoSize = 30.dp, fontSize = 22.sp, gap = 8.dp,
+                        modifier = Modifier.padding(start = if (onBack != null) 4.dp else 0.dp).height(44.dp)
+                    )
+                    Spacer(Modifier.weight(1f))
+                    ThemeButton()
                 }
                 content()
                 Spacer(Modifier.weight(1f))

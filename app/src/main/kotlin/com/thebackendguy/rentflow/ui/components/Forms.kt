@@ -1,5 +1,6 @@
 package com.thebackendguy.rentflow.ui.components
 
+import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -39,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -343,10 +345,35 @@ fun TextArea(label: String, value: String, onValueChange: (String) -> Unit, plac
 
 const val MAX_PHOTOS = 10
 
-/** Photo tiles four to a row; the first is the cover. Ends with an "Add" tile. */
+/**
+ * Keeps a form's photos when Android closes the app behind the camera: the
+ * stored ones by key and address, the new ones by their file.
+ */
+val PhotoListSaver = listSaver<List<Photo>, String>(
+    save = { photos ->
+        photos.flatMap { photo ->
+            when (photo) {
+                is Photo.Stored -> listOf("stored", photo.key, photo.url.orEmpty())
+                is Photo.Picked -> listOf("picked", photo.uri.toString(), "")
+            }
+        }
+    },
+    restore = { saved ->
+        saved.chunked(3).map { (kind, first, second) ->
+            if (kind == "stored") Photo.Stored(first, second.ifEmpty { null }) else Photo.Picked(Uri.parse(first))
+        }
+    }
+)
+
+/**
+ * Photo tiles four to a row; the first is the cover. Ends with an "Add" tile.
+ * Tapping a photo opens it full screen, where it can be cropped, made the
+ * cover or removed.
+ */
 @Composable
 fun PhotoGrid(photos: List<Photo>, onChange: (List<Photo>) -> Unit, max: Int = MAX_PHOTOS) {
     val addPhotos = photoChooser(limit = max) { uris -> onChange((photos + uris.map { Photo.Picked(it) }).take(max)) }
+    var viewing by remember { mutableStateOf<Int?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Photo positions, then null for the "Add" tile
         val cells: List<Int?> = photos.indices.toList() + if (photos.size < max) listOf(null) else emptyList()
@@ -370,7 +397,12 @@ fun PhotoGrid(photos: List<Photo>, onChange: (List<Photo>) -> Unit, max: Int = M
                                 }
                             }
                         } else {
-                            PhotoTile(photos[index], cover = index == 0) { onChange(photos.filterIndexed { i, _ -> i != index }) }
+                            PhotoTile(
+                                photos[index],
+                                cover = index == 0,
+                                onOpen = { viewing = index },
+                                onRemove = { onChange(photos.filterIndexed { i, _ -> i != index }) }
+                            )
                         }
                     }
                 }
@@ -383,12 +415,15 @@ fun PhotoGrid(photos: List<Photo>, onChange: (List<Photo>) -> Unit, max: Int = M
             color = Rf.Outline
         )
     }
+    viewing?.let { start ->
+        PhotoViewer(photos, start, onClose = { viewing = null }, onChange = onChange)
+    }
 }
 
 @Composable
-private fun PhotoTile(photo: Photo, cover: Boolean, onRemove: () -> Unit) {
+private fun PhotoTile(photo: Photo, cover: Boolean, onOpen: () -> Unit, onRemove: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.fillMaxSize().clip(shape)) {
+    Box(Modifier.fillMaxSize().pressable(onOpen, pressScale = 0.97f).clip(shape)) {
         RemoteImage(
             model = when (photo) {
                 is Photo.Stored -> photo.url
@@ -408,6 +443,20 @@ private fun PhotoTile(photo: Photo, cover: Boolean, onRemove: () -> Unit) {
                     .clip(RoundedCornerShape(6.dp))
                     .background(Rf.InverseSurface.copy(alpha = 0.85f))
                     .padding(horizontal = 6.dp, vertical = 1.dp)
+            )
+        }
+        // Not uploaded yet: saved with the form
+        if (photo is Photo.Picked) {
+            Text(
+                "NEW",
+                style = RfType.LabelSm.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                color = Rf.OnPrimary,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Rf.Primary)
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
             )
         }
         Box(

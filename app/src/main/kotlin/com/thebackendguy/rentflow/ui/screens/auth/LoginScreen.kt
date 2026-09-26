@@ -53,7 +53,6 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     initialRole: UserRole,
     notice: String?,
-    onBack: () -> Unit,
     onSignedIn: (UserRole) -> Unit,
     onForgotPassword: (UserRole) -> Unit,
     onRegister: () -> Unit
@@ -115,7 +114,7 @@ fun LoginScreen(
         }
     }
 
-    AuthShell(onBack = onBack, error = serverError, onDismissError = { serverError = null }) {
+    AuthShell(onBack = null, error = serverError, onDismissError = { serverError = null }) {
         if (notice != null) {
             InfoCard(Lucide.Info, "Please sign in again", notice, Modifier.padding(bottom = 20.dp), iconColor = Rf.Primary)
         }

@@ -16,6 +16,7 @@
         android:theme="@style/Theme.RentFlow">
         <activity
             android:name=".MainActivity"
+            android:configChanges="uiMode"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.RentFlow">

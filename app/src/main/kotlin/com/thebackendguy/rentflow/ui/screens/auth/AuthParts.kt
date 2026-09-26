@@ -89,7 +89,7 @@ fun RfCheckbox(checked: Boolean, onCheckedChange: (Boolean) -> Unit, label: Stri
                 .border(1.5.dp, if (checked) Rf.Primary else Rf.Outline, shape),
             contentAlignment = Alignment.Center
         ) {
-            if (checked) LIcon(Lucide.Check, size = 12.dp, tint = Color.White, strokeWidth = 3f)
+            if (checked) LIcon(Lucide.Check, size = 12.dp, tint = Rf.OnPrimary, strokeWidth = 3f)
         }
         Text(label, style = RfType.BodySm, color = Rf.OnSurfaceVariant)
     }

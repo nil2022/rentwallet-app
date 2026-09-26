@@ -62,6 +62,7 @@ import com.thebackendguy.rentflow.ui.components.IconRows
 import com.thebackendguy.rentflow.ui.components.IconTile
 import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.PhotoGrid
+import com.thebackendguy.rentflow.ui.components.PhotoListSaver
 import com.thebackendguy.rentflow.ui.components.Pill
 import com.thebackendguy.rentflow.ui.components.PrimaryButton
 import com.thebackendguy.rentflow.ui.components.RemoteImage
@@ -317,7 +318,9 @@ private fun RoomForm(
     var balcony by rememberSaveable { mutableStateOf(existing?.hasBalcony ?: false) }
     var furniture by rememberSaveable { mutableStateOf(existing?.furnitureDetails.orEmpty()) }
     var amenities by rememberSaveable { mutableStateOf(existing?.amenities.orEmpty()) }
-    var photos by remember { mutableStateOf<List<Photo>>(existing?.images.orEmpty().map { Photo.Stored(it.key, it.url) }) }
+    var photos by rememberSaveable(stateSaver = PhotoListSaver) {
+        mutableStateOf<List<Photo>>(existing?.images.orEmpty().map { Photo.Stored(it.key, it.url) })
+    }
     var submitted by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
 

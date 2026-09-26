@@ -46,7 +46,11 @@ object SessionStore {
     private const val KEY_MOBILE = "mobile"
     private const val KEY_PHOTO = "photo"
 
+    private const val KEY_LAST_ROLE = "last_role"
+
     private lateinit var prefs: SharedPreferences
+    // Kept apart from the session, so logging out doesn't forget it
+    private lateinit var settings: SharedPreferences
     private val _session = MutableStateFlow<Session?>(null)
     private val _ended = MutableStateFlow(false)
 
@@ -60,6 +64,7 @@ object SessionStore {
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("rentflow_session", Context.MODE_PRIVATE)
+        settings = context.applicationContext.getSharedPreferences("rentflow_settings", Context.MODE_PRIVATE)
         val token = prefs.getString(KEY_TOKEN, null)
         val role = UserRole.entries.find { it.name == prefs.getString(KEY_ROLE, null) }
         if (token != null && role != null) {
@@ -77,9 +82,14 @@ object SessionStore {
         }
     }
 
+    /** The role of the last sign-in, for Login to start on; Landlord before the first one. */
+    val lastRole: UserRole
+        get() = UserRole.entries.find { it.name == settings.getString(KEY_LAST_ROLE, null) } ?: UserRole.Landlord
+
     fun start(token: String, user: SessionUser, remember: Boolean) {
         _ended.value = false
         _session.value = Session(token, user)
+        settings.edit { putString(KEY_LAST_ROLE, user.role.name) }
         if (remember) save(token, user) else prefs.edit { clear() }
     }
 

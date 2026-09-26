@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- RentFlow logo tile and page surface, matching the web app -->
+    <!-- RentFlow logo tile and page surface (dark one in values-night), matching the web app -->
     <color name="rf_logo">#FF4F46E5</color>
     <color name="rf_surface">#FFF8F9FF</color>
 </resources>
