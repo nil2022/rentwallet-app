@@ -3,6 +3,7 @@ package com.thebackendguy.myandroidtestapp.ui.screens.tenant
 import androidx.compose.runtime.Composable
 import com.thebackendguy.myandroidtestapp.data.Demo
 import com.thebackendguy.myandroidtestapp.data.inr
+import com.thebackendguy.myandroidtestapp.data.session.SessionUser
 import com.thebackendguy.myandroidtestapp.ui.components.AppPage
 import com.thebackendguy.myandroidtestapp.ui.components.IconDetail
 import com.thebackendguy.myandroidtestapp.ui.components.IconRows
@@ -13,14 +14,14 @@ import com.thebackendguy.myandroidtestapp.ui.screens.ProfileHeader
 import com.thebackendguy.myandroidtestapp.ui.screens.Shell
 
 @Composable
-fun TenantProfileScreen(shell: Shell, onLogout: () -> Unit) {
+fun TenantProfileScreen(user: SessionUser?, shell: Shell, onLogout: () -> Unit) {
     AppPage(topBar = { shell.TopBar("Profile") }, bottomBar = { shell.BottomNav(2) }) {
-        ProfileHeader("RM", Demo.TENANT_NAME, "Tenant • ${Demo.PROPERTY}")
+        ProfileHeader(user?.initials.orEmpty(), user?.name.orEmpty(), "Tenant • ${Demo.PROPERTY}")
         TitledCard("Personal details") {
             IconRows(
                 listOf(
-                    IconDetail(Lucide.Smartphone, "Mobile", Demo.TENANT_PHONE),
-                    IconDetail(Lucide.Mail, "Email", Demo.TENANT_EMAIL),
+                    IconDetail(Lucide.Smartphone, "Mobile", user?.mobileLabel ?: "Not added"),
+                    IconDetail(Lucide.Mail, "Email", user?.email.orEmpty()),
                     IconDetail(Lucide.Building2, "Current property", Demo.PROPERTY),
                     IconDetail(Lucide.User, "Landlord", Demo.LANDLORD_NAME)
                 )

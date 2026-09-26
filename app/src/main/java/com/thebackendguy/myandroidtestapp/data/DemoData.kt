@@ -34,14 +34,10 @@ data class Tenant(
     val lastPayment: String
 )
 
-/** Sample data until the app talks to the RentFlow API. */
+/** Sample data for the parts that don’t use the RentFlow API yet (rent, payments, wallet). */
 object Demo {
     const val TENANT_NAME = "Rohan Mehta"
-    const val TENANT_EMAIL = "rohan.mehta@example.com"
-    const val TENANT_PHONE = "+91 98765 43210"
     const val LANDLORD_NAME = "Amit Sharma"
-    const val LANDLORD_EMAIL = "amit.sharma@example.com"
-    const val LANDLORD_PHONE = "+91 90123 45678"
     const val PROPERTY = "Green View Residency"
     const val ADDRESS = "Flat 4B, Salt Lake, Kolkata"
     const val MONTHLY_RENT = 18_500

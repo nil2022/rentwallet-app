@@ -288,9 +288,15 @@ fun AppPage(
 /**
  * Frame for login, forgot password and registration: back button and brand
  * lockup on top, footer links at the bottom (the web's MobileAuthShell).
+ * [error] floats up from the bottom until [onDismissError] clears it.
  */
 @Composable
-fun AuthShell(onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun AuthShell(
+    onBack: () -> Unit,
+    error: String? = null,
+    onDismissError: () -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit
+) {
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
@@ -338,6 +344,7 @@ fun AuthShell(onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
                 }
             }
         }
+        FloatingError(error, onDismissError, Modifier.align(Alignment.BottomCenter))
     }
 }
 

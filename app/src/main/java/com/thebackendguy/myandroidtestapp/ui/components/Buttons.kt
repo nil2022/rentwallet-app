@@ -25,21 +25,25 @@ import com.thebackendguy.myandroidtestapp.ui.icons.LucideIcon
 import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
 
-/** Full-width indigo button with a trailing arrow (the web's PrimaryButton). */
+/**
+ * Full-width indigo button with a trailing arrow (the web's PrimaryButton).
+ * While [loading] it shows a spinner and ignores taps.
+ */
 @Composable
 fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    showArrow: Boolean = true
+    showArrow: Boolean = true,
+    loading: Boolean = false
 ) {
     val shape = RoundedCornerShape(12.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else 0.6f)
-            .pressable(onClick, pressScale = 0.98f, enabled = enabled)
+            .pressable(onClick, pressScale = 0.98f, enabled = enabled && !loading)
             .softShadow(shape, elevation = 4.dp, color = Rf.Primary.copy(alpha = 0.45f))
             .clip(shape)
             .background(Rf.Primary)
@@ -47,8 +51,9 @@ fun PrimaryButton(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (loading) Spinner(Color.White)
         Text(text = text, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
-        if (showArrow) LIcon(Lucide.ArrowRight, size = 18.dp, tint = Color.White)
+        if (showArrow && !loading) LIcon(Lucide.ArrowRight, size = 18.dp, tint = Color.White)
     }
 }
 

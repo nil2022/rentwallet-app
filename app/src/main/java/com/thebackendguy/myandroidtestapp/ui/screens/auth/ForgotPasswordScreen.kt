@@ -13,6 +13,8 @@ import androidx.compose.foundation.border
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,7 +30,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.thebackendguy.myandroidtestapp.data.AuthRepository
 import com.thebackendguy.myandroidtestapp.data.UserRole
+import com.thebackendguy.myandroidtestapp.data.remote.ApiResult
 import com.thebackendguy.myandroidtestapp.ui.components.AuthShell
 import com.thebackendguy.myandroidtestapp.ui.components.PrimaryButton
 import com.thebackendguy.myandroidtestapp.ui.components.RfTextField
@@ -36,10 +40,11 @@ import com.thebackendguy.myandroidtestapp.ui.icons.LIcon
 import com.thebackendguy.myandroidtestapp.ui.icons.Lucide
 import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
+import kotlinx.coroutines.launch
 
 /**
  * Password reset in three steps, with the web's wording: email, then the code
- * and a new password, then a confirmation.
+ * and a new password, then a confirmation. The API emails the code.
  */
 @Composable
 fun ForgotPasswordScreen(role: UserRole, onBack: () -> Unit, onBackToLogin: () -> Unit) {
@@ -49,14 +54,18 @@ fun ForgotPasswordScreen(role: UserRole, onBack: () -> Unit, onBackToLogin: () -
     var newPassword by rememberSaveable { mutableStateOf("") }
     var confirm by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var serverError by rememberSaveable { mutableStateOf<String?>(null) }
 
     val goBack: () -> Unit = {
         submitted = false
+        serverError = null
         if (step == 1) step = 0 else onBack()
     }
     BackHandler(enabled = step == 1) { goBack() }
 
-    AuthShell(onBack = if (step == 2) onBackToLogin else goBack) {
+    AuthShell(onBack = if (step == 2) onBackToLogin else goBack, error = serverError, onDismissError = { serverError = null }) {
         when (step) {
             0 -> {
                 HeadIcon(Lucide.KeyRound)
@@ -70,9 +79,20 @@ fun ForgotPasswordScreen(role: UserRole, onBack: () -> Unit, onBackToLogin: () -
                 Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     val sendOtp: () -> Unit = {
                         submitted = true
-                        if (emailError(email) == null) {
-                            submitted = false
-                            step = 1
+                        if (emailError(email) == null && !busy) {
+                            busy = true
+                            serverError = null
+                            scope.launch {
+                                val result = AuthRepository.requestPasswordReset(role, email)
+                                busy = false
+                                when (result) {
+                                    is ApiResult.Ok -> {
+                                        submitted = false
+                                        step = 1
+                                    }
+                                    is ApiResult.Fail -> serverError = result.message
+                                }
+                            }
                         }
                     }
                     RfTextField(
@@ -86,7 +106,10 @@ fun ForgotPasswordScreen(role: UserRole, onBack: () -> Unit, onBackToLogin: () -
                         onImeAction = sendOtp,
                         error = if (submitted) emailError(email) else null
                     )
-                    PrimaryButton("Send Reset OTP (${role.name})", onClick = sendOtp, modifier = Modifier.padding(top = 8.dp))
+                    PrimaryButton(
+                        if (busy) "Sending OTP…" else "Send Reset OTP (${role.name})",
+                        onClick = sendOtp, loading = busy, modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
                 BackToLogin(onBackToLogin)
             }
@@ -111,9 +134,20 @@ fun ForgotPasswordScreen(role: UserRole, onBack: () -> Unit, onBackToLogin: () -
                 }
                 val reset: () -> Unit = {
                     submitted = true
-                    if (codeError(code) == null && newPasswordError(newPassword) == null && confirm == newPassword) {
-                        submitted = false
-                        step = 2
+                    if (codeError(code) == null && newPasswordError(newPassword) == null && confirm == newPassword && !busy) {
+                        busy = true
+                        serverError = null
+                        scope.launch {
+                            val result = AuthRepository.resetPassword(role, email, code, newPassword)
+                            busy = false
+                            when (result) {
+                                is ApiResult.Ok -> {
+                                    submitted = false
+                                    step = 2
+                                }
+                                is ApiResult.Fail -> serverError = result.message
+                            }
+                        }
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -147,7 +181,10 @@ fun ForgotPasswordScreen(role: UserRole, onBack: () -> Unit, onBackToLogin: () -
                         onImeAction = reset,
                         error = confirmError
                     )
-                    PrimaryButton("Reset Password", onClick = reset, modifier = Modifier.padding(top = 8.dp))
+                    PrimaryButton(
+                        if (busy) "Resetting…" else "Reset Password",
+                        onClick = reset, loading = busy, modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
                 BackToLogin(onBackToLogin)
             }

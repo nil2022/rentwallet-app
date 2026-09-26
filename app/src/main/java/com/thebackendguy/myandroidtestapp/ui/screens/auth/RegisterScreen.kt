@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,22 +33,30 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.thebackendguy.myandroidtestapp.data.AuthRepository
+import com.thebackendguy.myandroidtestapp.data.UserRole
+import com.thebackendguy.myandroidtestapp.data.remote.ApiResult
 import com.thebackendguy.myandroidtestapp.ui.components.AuthShell
 import com.thebackendguy.myandroidtestapp.ui.components.Dot
 import com.thebackendguy.myandroidtestapp.ui.components.InfoCard
 import com.thebackendguy.myandroidtestapp.ui.components.OtpBoxes
 import com.thebackendguy.myandroidtestapp.ui.components.PrimaryButton
 import com.thebackendguy.myandroidtestapp.ui.components.RfTextField
+import com.thebackendguy.myandroidtestapp.ui.components.Spinner
 import com.thebackendguy.myandroidtestapp.ui.components.TextLink
 import com.thebackendguy.myandroidtestapp.ui.components.pressable
 import com.thebackendguy.myandroidtestapp.ui.icons.LIcon
 import com.thebackendguy.myandroidtestapp.ui.icons.Lucide
 import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
+import kotlinx.coroutines.launch
 
 /**
  * Landlord sign-up: the web's phone registration form, then its email
  * verification step. Tenants are added by their landlord, so they don't register.
+ *
+ * Same order as the web: create the account, email a code, verify it, then
+ * sign in with the password from the form.
  */
 @Composable
 fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> Unit) {
@@ -58,20 +68,69 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
     var code by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf(false) }
     val timer = rememberCountdown()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var resending by remember { mutableStateOf(false) }
+    var serverError by rememberSaveable { mutableStateOf<String?>(null) }
+    var resumeNote by rememberSaveable { mutableStateOf<String?>(null) }
+    // The details the account was created with, so going back and on doesn't create it twice
+    var createdWith by rememberSaveable { mutableStateOf<String?>(null) }
 
-    BackHandler(enabled = step == 1) { step = 0 }
+    val backToForm: () -> Unit = {
+        step = 0
+        serverError = null
+    }
+    BackHandler(enabled = step == 1) { backToForm() }
 
-    AuthShell(onBack = { if (step == 1) step = 0 else onBack() }) {
+    fun codeSent(note: String?) {
+        submitted = false
+        code = ""
+        timer.intValue = 60
+        resumeNote = note
+        serverError = null
+        step = 1
+    }
+
+    AuthShell(onBack = { if (step == 1) backToForm() else onBack() }, error = serverError, onDismissError = { serverError = null }) {
         if (step == 0) {
             val nameErr = if (submitted && name.isBlank()) "Full name is required" else null
-            val phoneErr = if (submitted && phone.length != 10) "Enter a 10-digit mobile number" else null
+            val phoneValid = phone.length == 10 && phone.first() in '6'..'9'
+            val phoneErr = if (submitted && !phoneValid) "Enter a valid 10-digit mobile number" else null
             val next: () -> Unit = {
                 submitted = true
-                if (name.isNotBlank() && emailError(email) == null && phone.length == 10 && newPasswordError(password) == null) {
-                    submitted = false
-                    code = ""
-                    timer.intValue = 60
-                    step = 1
+                if (name.isNotBlank() && emailError(email) == null && phoneValid && newPasswordError(password) == null && !busy) {
+                    busy = true
+                    serverError = null
+                    val details = listOf(name.trim(), email.lowercase(), phone, password).joinToString("\n")
+                    scope.launch {
+                        if (createdWith != details) {
+                            when (val created = AuthRepository.registerLandlord(name, email, phone, password)) {
+                                is ApiResult.Ok -> createdWith = details
+                                is ApiResult.Fail -> {
+                                    if (ALREADY_TAKEN.containsMatchIn(created.message)) {
+                                        // An unfinished sign-up may own this email: send it a new code
+                                        when (val resumed = AuthRepository.sendSignupCode(email)) {
+                                            is ApiResult.Ok -> {
+                                                createdWith = details
+                                                codeSent("This email already has an unverified account, so we sent it a new code.")
+                                            }
+                                            is ApiResult.Fail -> serverError =
+                                                if (resumed.message.contains("not found", ignoreCase = true)) created.message else resumed.message
+                                        }
+                                    } else {
+                                        serverError = created.message
+                                    }
+                                    busy = false
+                                    return@launch
+                                }
+                            }
+                        }
+                        when (val sent = AuthRepository.sendSignupCode(email)) {
+                            is ApiResult.Ok -> codeSent(null)
+                            is ApiResult.Fail -> serverError = sent.message
+                        }
+                        busy = false
+                    }
                 }
             }
 
@@ -106,7 +165,10 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
                     placeholder = "Create a password", isPassword = true, imeAction = ImeAction.Go, onImeAction = next,
                     hint = PASSWORD_RULE, error = if (submitted) newPasswordError(password) else null
                 )
-                PrimaryButton("Continue to Verification", onClick = next, modifier = Modifier.padding(top = 8.dp))
+                PrimaryButton(
+                    if (busy) "Creating account…" else "Continue to Verification",
+                    onClick = next, loading = busy, modifier = Modifier.padding(top = 8.dp)
+                )
             }
             Text(
                 text = buildAnnotatedString {
@@ -125,6 +187,39 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
             }
         } else {
             val complete = code.length == 6
+            val verify: () -> Unit = {
+                if (complete && !busy) {
+                    busy = true
+                    serverError = null
+                    scope.launch {
+                        when (val verified = AuthRepository.verifySignupCode(email, code)) {
+                            is ApiResult.Fail -> serverError = verified.message
+                            is ApiResult.Ok -> {
+                                // Verified. Sign in with the form's password; if that fails, the login screen takes over
+                                val signedIn = AuthRepository.login(UserRole.Landlord, email, password, remember = true)
+                                if (signedIn is ApiResult.Ok) onRegistered() else onLogin()
+                            }
+                        }
+                        busy = false
+                    }
+                }
+            }
+            val resend: () -> Unit = {
+                if (!busy && !resending) {
+                    resending = true
+                    serverError = null
+                    scope.launch {
+                        when (val sent = AuthRepository.sendSignupCode(email)) {
+                            is ApiResult.Ok -> {
+                                code = ""
+                                timer.intValue = 60
+                            }
+                            is ApiResult.Fail -> serverError = sent.message
+                        }
+                        resending = false
+                    }
+                }
+            }
             HeadIcon(Lucide.MailCheck)
             Text("Verify Your Email", style = RfType.HeadlineLg, color = Rf.OnSurface)
             Text(
@@ -144,8 +239,11 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
                     "Change Email",
                     style = RfType.LabelMd.copy(textDecoration = TextDecoration.Underline),
                     color = Rf.Primary,
-                    modifier = Modifier.pressable({ step = 0 })
+                    modifier = Modifier.pressable(backToForm)
                 )
+            }
+            resumeNote?.let {
+                InfoCard(Lucide.Info, "Welcome back", it, Modifier.padding(top = 16.dp), iconColor = Rf.Primary)
             }
             Row(
                 Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 10.dp),
@@ -172,7 +270,7 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
                 val waiting = timer.intValue > 0
                 Row(
                     Modifier
-                        .pressable(if (waiting) null else ({ code = ""; timer.intValue = 60 }))
+                        .pressable(if (waiting || busy || resending) null else resend)
                         .clip(RoundedCornerShape(10.dp))
                         .background(Rf.Low)
                         .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -180,18 +278,23 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val tint = if (waiting) Rf.Outline else Rf.Primary
-                    LIcon(Lucide.Clock3, size = 14.dp, tint = tint)
+                    if (resending) Spinner(tint, size = 14.dp, strokeWidth = 1.5.dp) else LIcon(Lucide.Clock3, size = 14.dp, tint = tint)
                     Text(
-                        if (waiting) "Resend Code in 00:%02ds".format(timer.intValue) else "Resend Code",
+                        when {
+                            resending -> "Sending code…"
+                            waiting -> "Resend Code in 00:%02ds".format(timer.intValue)
+                            else -> "Resend Code"
+                        },
                         style = RfType.LabelSm.copy(fontSize = 11.5.sp, fontWeight = FontWeight.Bold),
                         color = tint
                     )
                 }
             }
             PrimaryButton(
-                "Verify Code & Go to Dashboard",
-                onClick = onRegistered,
+                if (busy) "Verifying…" else "Verify Code & Go to Dashboard",
+                onClick = verify,
                 enabled = complete,
+                loading = busy,
                 modifier = Modifier.padding(top = 24.dp)
             )
             Row(
@@ -205,3 +308,6 @@ fun RegisterScreen(onBack: () -> Unit, onLogin: () -> Unit, onRegistered: () -> 
         }
     }
 }
+
+/** How the API words a sign-up for an email or mobile that already has an account. */
+private val ALREADY_TAKEN = Regex("already|exists|registered", RegexOption.IGNORE_CASE)

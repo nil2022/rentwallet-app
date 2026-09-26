@@ -23,16 +23,21 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.thebackendguy.myandroidtestapp.data.AuthRepository
 import com.thebackendguy.myandroidtestapp.data.Demo
 import com.thebackendguy.myandroidtestapp.data.UserRole
+import com.thebackendguy.myandroidtestapp.data.session.SessionStore
 import com.thebackendguy.myandroidtestapp.data.settled
 import com.thebackendguy.myandroidtestapp.ui.components.BrandLockup
 import com.thebackendguy.myandroidtestapp.ui.components.Notice
@@ -82,6 +87,7 @@ private val LandlordNotices = listOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SessionStore.init(applicationContext)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(
                 scrim = android.graphics.Color.TRANSPARENT,
@@ -100,10 +106,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun homeFor(role: UserRole) = if (role == UserRole.Tenant) Screen.TenantHome else Screen.LandlordOverview
+
 @Composable
 private fun RentFlowApp() {
-    var screen by rememberSaveable { mutableStateOf(Screen.Welcome) }
-    var role by rememberSaveable { mutableStateOf(UserRole.Tenant) }
+    val session by SessionStore.session.collectAsState()
+    val endedByServer by SessionStore.endedByServer.collectAsState()
+    // A saved session opens straight on its home screen
+    val saved = remember { SessionStore.session.value }
+    var screen by rememberSaveable { mutableStateOf(saved?.let { homeFor(it.user.role) } ?: Screen.Welcome) }
+    var role by rememberSaveable { mutableStateOf(saved?.user?.role ?: UserRole.Tenant) }
     var payIndex by rememberSaveable { mutableIntStateOf(0) }
     var receiptIndex by rememberSaveable { mutableIntStateOf(0) }
     var receiptBack by rememberSaveable { mutableStateOf(Screen.PaymentHistory) }
@@ -120,6 +132,7 @@ private fun RentFlowApp() {
     fun signOut() {
         paidIndexes = emptyList()
         screen = Screen.Welcome
+        scope.launch { AuthRepository.logout() }
     }
 
     fun openReceipt(index: Int, from: Screen) {
@@ -152,10 +165,24 @@ private fun RentFlowApp() {
 
     val signedIn = screen in TenantTabScreens || screen in LandlordTabScreens ||
         screen in listOf(Screen.PayRent, Screen.PaymentSuccess, Screen.Receipt, Screen.PropertyDetails)
+
+    // Check the saved token and refresh the name and contact details
+    LaunchedEffect(Unit) { AuthRepository.refreshProfile() }
+
+    // The session ended (token rejected, or the app restarted without "Remember me")
+    LaunchedEffect(session == null, signedIn) {
+        if (session == null && signedIn) {
+            drawerState.close()
+            paidIndexes = emptyList()
+            screen = Screen.Login
+        }
+    }
+
+    val user = session?.user
     val tabScreens = if (role == UserRole.Tenant) TenantTabScreens else LandlordTabScreens
     val shell = Shell(
         role = role,
-        initials = if (role == UserRole.Tenant) "RM" else "AS",
+        initials = user?.initials ?: "",
         notices = if (role == UserRole.Tenant) TenantNotices else LandlordNotices,
         onMenu = { scope.launch { drawerState.open() } },
         onProfile = { screen = tabScreens.last() },
@@ -170,7 +197,7 @@ private fun RentFlowApp() {
                 Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 16.dp)) {
                     BrandLockup(color = Rf.OnSurface, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
                     Text(
-                        text = if (role == UserRole.Tenant) "${Demo.TENANT_NAME} • Tenant" else "${Demo.LANDLORD_NAME} • Landlord",
+                        text = "${user?.name.orEmpty()} • ${role.name}",
                         style = RfType.LabelSm,
                         color = Rf.OnSurfaceVariant,
                         modifier = Modifier.padding(start = 12.dp, bottom = 16.dp)
@@ -225,6 +252,7 @@ private fun RentFlowApp() {
 
                 Screen.Login -> LoginScreen(
                     initialRole = role,
+                    notice = if (endedByServer) "Your session has ended. Please sign in again." else null,
                     onBack = { screen = Screen.Welcome },
                     onSignedIn = {
                         role = it
@@ -256,6 +284,7 @@ private fun RentFlowApp() {
                 )
 
                 Screen.TenantHome -> TenantHomeScreen(
+                    firstName = user?.firstName.orEmpty(),
                     payments = payments,
                     shell = shell,
                     onPayRent = {
@@ -299,9 +328,10 @@ private fun RentFlowApp() {
                     onBack = { screen = receiptBack }
                 )
 
-                Screen.TenantProfile -> TenantProfileScreen(shell = shell, onLogout = ::signOut)
+                Screen.TenantProfile -> TenantProfileScreen(user = user, shell = shell, onLogout = ::signOut)
 
                 Screen.LandlordOverview -> LandlordOverviewScreen(
+                    firstName = user?.firstName.orEmpty(),
                     tenants = tenants,
                     shell = shell,
                     onOpenTenants = { screen = Screen.Tenants },
@@ -320,7 +350,7 @@ private fun RentFlowApp() {
                     onBack = { screen = propertyBack }
                 )
 
-                Screen.LandlordProfile -> LandlordProfileScreen(tenants = tenants, shell = shell, onLogout = ::signOut)
+                Screen.LandlordProfile -> LandlordProfileScreen(user = user, tenants = tenants, shell = shell, onLogout = ::signOut)
             }
         }
     }

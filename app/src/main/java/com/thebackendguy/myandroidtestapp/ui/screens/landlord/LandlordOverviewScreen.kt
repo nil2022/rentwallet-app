@@ -54,6 +54,7 @@ private const val WITHDRAWAL = 15_000
 
 @Composable
 fun LandlordOverviewScreen(
+    firstName: String,
     tenants: List<Tenant>,
     shell: Shell,
     onOpenTenants: () -> Unit,
@@ -67,7 +68,7 @@ fun LandlordOverviewScreen(
     val percent = if (tenants.isEmpty()) 0 else paid.size * 100 / tenants.size
 
     AppPage(
-        topBar = { shell.TopBar("Hello, Amit 👋", chip = "${tenants.size} properties") },
+        topBar = { shell.TopBar(if (firstName.isEmpty()) "Hello 👋" else "Hello, $firstName 👋", chip = "${tenants.size} properties") },
         bottomBar = { shell.BottomNav(0) }
     ) {
         DarkCard {

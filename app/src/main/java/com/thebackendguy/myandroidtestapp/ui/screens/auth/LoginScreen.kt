@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -26,26 +28,31 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.thebackendguy.myandroidtestapp.data.AuthRepository
 import com.thebackendguy.myandroidtestapp.data.UserRole
+import com.thebackendguy.myandroidtestapp.data.remote.ApiResult
 import com.thebackendguy.myandroidtestapp.ui.components.AuthShell
 import com.thebackendguy.myandroidtestapp.ui.components.InfoCard
 import com.thebackendguy.myandroidtestapp.ui.components.PrimaryButton
 import com.thebackendguy.myandroidtestapp.ui.components.RfTextField
 import com.thebackendguy.myandroidtestapp.ui.components.RoleSwitch
+import com.thebackendguy.myandroidtestapp.ui.components.Spinner
 import com.thebackendguy.myandroidtestapp.ui.components.TextLink
 import com.thebackendguy.myandroidtestapp.ui.components.pressable
 import com.thebackendguy.myandroidtestapp.ui.icons.Lucide
 import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
+import kotlinx.coroutines.launch
 
 /**
  * One sign-in screen for both roles (the web's MobileLoginForm): email with a
- * password, or a one-time code. There is no API yet, so any valid email and
- * password, or any 6-digit code, signs in.
+ * password, or a one-time code emailed by the API. [notice] explains why the
+ * user was sent here, such as an expired session.
  */
 @Composable
 fun LoginScreen(
     initialRole: UserRole,
+    notice: String?,
     onBack: () -> Unit,
     onSignedIn: (UserRole) -> Unit,
     onForgotPassword: (UserRole) -> Unit,
@@ -60,6 +67,10 @@ fun LoginScreen(
     var rememberMe by rememberSaveable { mutableStateOf(true) }
     var submitted by rememberSaveable { mutableStateOf(false) }
     val timer = rememberCountdown()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var sending by remember { mutableStateOf(false) }
+    var serverError by rememberSaveable { mutableStateOf<String?>(null) }
 
     val emailErr = if (submitted) emailError(email) else null
     val passwordErr = if (submitted && !usingOtp && password.isEmpty()) "Password is required" else null
@@ -68,7 +79,18 @@ fun LoginScreen(
     fun submit() {
         submitted = true
         val ok = emailError(email) == null && if (usingOtp) otpSent && codeError(code) == null else password.isNotEmpty()
-        if (ok) onSignedIn(role)
+        if (!ok || busy) return
+        busy = true
+        serverError = null
+        scope.launch {
+            val result = if (usingOtp) AuthRepository.verifyLoginCode(role, email, code, rememberMe)
+            else AuthRepository.login(role, email, password, rememberMe)
+            busy = false
+            when (result) {
+                is ApiResult.Ok -> onSignedIn(role)
+                is ApiResult.Fail -> serverError = explain(result.message)
+            }
+        }
     }
 
     fun sendCode() {
@@ -76,12 +98,27 @@ fun LoginScreen(
             submitted = true
             return
         }
-        otpSent = true
-        code = ""
-        timer.intValue = 60
+        if (sending) return
+        sending = true
+        serverError = null
+        scope.launch {
+            val result = AuthRepository.sendLoginCode(role, email)
+            sending = false
+            when (result) {
+                is ApiResult.Ok -> {
+                    otpSent = true
+                    code = ""
+                    timer.intValue = 60
+                }
+                is ApiResult.Fail -> serverError = result.message
+            }
+        }
     }
 
-    AuthShell(onBack = onBack) {
+    AuthShell(onBack = onBack, error = serverError, onDismissError = { serverError = null }) {
+        if (notice != null) {
+            InfoCard(Lucide.Info, "Please sign in again", notice, Modifier.padding(bottom = 20.dp), iconColor = Rf.Primary)
+        }
         AnimatedContent(targetState = role, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "loginTitle") { r ->
             Text(
                 text = if (r == UserRole.Landlord) "Welcome back, Landlord" else "Welcome back, Resident",
@@ -100,7 +137,10 @@ fun LoginScreen(
             modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
         )
 
-        RoleSwitch(selected = role, onSelect = { role = it })
+        RoleSwitch(selected = role, onSelect = {
+            role = it
+            serverError = null
+        })
 
         Column(Modifier.padding(top = 24.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             RfTextField(
@@ -126,21 +166,28 @@ fun LoginScreen(
                     error = codeErr,
                     trailing = {
                         val waiting = timer.intValue > 0
-                        Text(
-                            text = when {
-                                waiting -> "${timer.intValue}s"
-                                otpSent -> "Resend"
-                                else -> "Send code"
-                            },
-                            style = RfType.LabelSm,
-                            color = if (waiting) Rf.Outline else Rf.Primary,
-                            modifier = Modifier
+                        Row(
+                            Modifier
                                 .padding(end = 6.dp)
-                                .pressable(if (waiting) null else ({ sendCode() }))
+                                .pressable(if (waiting || sending) null else ({ sendCode() }))
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Rf.Low)
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (sending) Spinner(Rf.Primary, size = 12.dp, strokeWidth = 1.5.dp)
+                            Text(
+                                text = when {
+                                    sending -> "Sending…"
+                                    waiting -> "${timer.intValue}s"
+                                    otpSent -> "Resend"
+                                    else -> "Send code"
+                                },
+                                style = RfType.LabelSm,
+                                color = if (waiting) Rf.Outline else Rf.Primary
+                            )
+                        }
                     }
                 )
             } else {
@@ -165,8 +212,13 @@ fun LoginScreen(
                 }
             }
             PrimaryButton(
-                text = if (usingOtp) "Verify & Sign In" else "Sign In to Dashboard",
+                text = when {
+                    busy -> "Signing in…"
+                    usingOtp -> "Verify & Sign In"
+                    else -> "Sign In to Dashboard"
+                },
                 onClick = ::submit,
+                loading = busy,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
@@ -177,6 +229,7 @@ fun LoginScreen(
                 onClick = {
                     usingOtp = !usingOtp
                     submitted = false
+                    serverError = null
                 }
             )
         }
@@ -199,3 +252,9 @@ fun LoginScreen(
         }
     }
 }
+
+/** A landlord who never finished sign-up can verify the email by signing in with a code. */
+private fun explain(message: String): String =
+    if (message.equals("Email not verified", ignoreCase = true)) {
+        "Your email isn’t verified yet. Tap “Login with OTP instead” to verify it and sign in."
+    } else message

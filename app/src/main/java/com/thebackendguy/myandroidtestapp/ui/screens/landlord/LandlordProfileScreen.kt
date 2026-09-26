@@ -19,6 +19,7 @@ import com.thebackendguy.myandroidtestapp.data.Demo
 import com.thebackendguy.myandroidtestapp.data.PayStatus
 import com.thebackendguy.myandroidtestapp.data.Tenant
 import com.thebackendguy.myandroidtestapp.data.inr
+import com.thebackendguy.myandroidtestapp.data.session.SessionUser
 import com.thebackendguy.myandroidtestapp.ui.components.AppPage
 import com.thebackendguy.myandroidtestapp.ui.components.Caption
 import com.thebackendguy.myandroidtestapp.ui.components.HealthTileSpec
@@ -38,19 +39,19 @@ import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
 
 @Composable
-fun LandlordProfileScreen(tenants: List<Tenant>, shell: Shell, onLogout: () -> Unit) {
+fun LandlordProfileScreen(user: SessionUser?, tenants: List<Tenant>, shell: Shell, onLogout: () -> Unit) {
     val paid = tenants.filter { it.status == PayStatus.Paid }
     val pending = tenants.filter { it.status != PayStatus.Paid }
     val percent = if (tenants.isEmpty()) 0 else paid.size * 100 / tenants.size
 
     AppPage(topBar = { shell.TopBar("Profile") }, bottomBar = { shell.BottomNav(2) }) {
-        ProfileHeader("AS", Demo.LANDLORD_NAME, "Landlord • ${tenants.size} properties")
+        ProfileHeader(user?.initials.orEmpty(), user?.name.orEmpty(), "Landlord • ${tenants.size} properties")
 
         TitledCard("Owner details") {
             IconRows(
                 listOf(
-                    IconDetail(Lucide.Smartphone, "Mobile", Demo.LANDLORD_PHONE),
-                    IconDetail(Lucide.Mail, "Email", Demo.LANDLORD_EMAIL),
+                    IconDetail(Lucide.Smartphone, "Mobile", user?.mobileLabel ?: "Not added"),
+                    IconDetail(Lucide.Mail, "Email", user?.email.orEmpty()),
                     IconDetail(Lucide.Users, "Total tenants", tenants.size.toString()),
                     IconDetail(Lucide.Building2, "Active properties", tenants.size.toString())
                 )

@@ -44,6 +44,7 @@ import com.thebackendguy.myandroidtestapp.ui.theme.RfType
 
 @Composable
 fun TenantHomeScreen(
+    firstName: String,
     payments: List<RentPayment>,
     shell: Shell,
     onPayRent: () -> Unit,
@@ -55,7 +56,7 @@ fun TenantHomeScreen(
     val paid = current.status == PayStatus.Paid
     val latestReceipt = payments.indexOfFirst { it.status == PayStatus.Paid }
 
-    AppPage(topBar = { shell.TopBar("Hello, Rohan 👋", chip = "Green View") }, bottomBar = { shell.BottomNav(0) }) {
+    AppPage(topBar = { shell.TopBar(if (firstName.isEmpty()) "Hello 👋" else "Hello, $firstName 👋", chip = "Green View") }, bottomBar = { shell.BottomNav(0) }) {
         DarkCard {
             DarkCardHeader("${current.month} rent") {
                 if (paid) Pill("Paid", background = Rf.SecondaryContainer.copy(alpha = 0.2f), content = Rf.Mint, dot = true)
