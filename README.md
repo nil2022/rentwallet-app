@@ -183,6 +183,8 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Secondary container | `#82F5C1` | | On surface variant | `#464555` |
 | Error | `#BA1A1A` | | Inverse surface (dark cards) | `#213145` |
 
+**Dark theme.** The moon/sun button in the top bar switches the signed-in screens between light and dark. Dark uses the web’s dark phone palette (surface `#0C1424`, cards `#152036`, primary `#AEB0FF`, success `#68DBA9`, error `#FFB4AB`). Until the user picks one, the app follows the phone’s setting, and the choice is kept after logging out. The welcome and sign-in screens stay light, as on the web, and the navy summary cards look the same in both themes.
+
 **Type.** Plus Jakarta Sans, with the web’s phone type scale ([`Type.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Type.kt)):
 
 | Style | Size / line height | Weight | Used for |
@@ -200,6 +202,8 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 
 **Components.** Cards with 12 dp corners and a soft shadow, dark summary cards, pill-shaped filters with a sliding thumb, quick-action chips that scroll sideways, and a bottom bar with the Material 3 pill indicator. Forms use choice chips, switches, steppers, dropdowns, a date picker and a photo grid, with the save button in a bar pinned to the bottom. Buttons shrink slightly when pressed instead of showing a ripple, as on the web.
 
+**Photos on a slow network.** Photos can be taken with the camera or picked from the gallery. While a property or room photo downloads, its indigo placeholder shows a light band sliding across it; the photo then fades in, and if it can’t be fetched the placeholder offers “Tap to retry”. Profile photos show the Stitch design’s Wave Sweep (a ring of colour, a pulse, a sweep and a camera icon) and fall back to the person’s initials, with a retry button on the larger ones. Lists that load for the first time show pulsing placeholder cards. Photos already downloaded are kept on the phone and show without a network.
+
 ## Tech stack
 
 | | |
@@ -209,7 +213,8 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Android | minSdk 28, targetSdk and compileSdk 36 |
 | Build | Android Gradle Plugin 9.3, Gradle version catalog |
 | Networking | Retrofit 3, OkHttp 4.12, kotlinx.serialization 1.9 |
-| Images | Coil 3; photos are resized to 1600 px JPEGs before upload |
+| Images | Coil 3 with 15 s connect / 30 s read timeouts; photos are resized to 1600 px JPEGs before upload |
+| Theme | Light and dark palettes in [`Color.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Color.kt); the choice is saved in SharedPreferences |
 | Session | Token and account details in SharedPreferences (only with “Remember me”) |
 | Navigation | A back stack of screens in Compose state, no navigation library |
 | Sample data | [`DemoData.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/data/DemoData.kt) for rent, payments and wallet |
@@ -228,9 +233,9 @@ app/src/main/
 │   │   ├── session/              # SessionStore: the signed-in account and token
 │   │   └── remote/               # ApiConfig (server address), Retrofit APIs, DTOs, photo uploads
 │   └── ui/
-│       ├── theme/                # Color.kt, Type.kt, Theme.kt
+│       ├── theme/                # Light and dark colours, type, theme switch
 │       ├── icons/                # Lucide.kt (generated), LucideIcon.kt
-│       ├── components/           # Cards, buttons, fields, forms, states, floating messages, page frames
+│       ├── components/           # Cards, buttons, fields, forms, states, photos and loaders, camera/gallery picker, page frames
 │       └── screens/
 │           ├── Shell.kt          # Top bar and tabs per role, profile header, log out button
 │           ├── auth/             # Welcome, Login, Forgot Password, Register
@@ -239,7 +244,7 @@ app/src/main/
 ├── res/
 │   ├── font/plus_jakarta_sans.ttf
 │   ├── drawable/                 # Launcher icon layers
-│   ├── xml/network_security_config.xml
+│   ├── xml/                      # Network security, FileProvider paths for camera photos
 │   └── values/                   # App name, colours, window theme
 └── assets/licenses/OFL-PlusJakartaSans.txt
 ```
@@ -283,6 +288,7 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 3. **Tenant rent screens:** need backend work first. Payments and notifications must be limited to the signed-in user (today `/tenant/payment` and `/tenant/notification` return everyone’s), and tenants need an endpoint for their own lease.
 4. **Landlord collections:** need landlord payment, monthly summary and reminder endpoints. They replace the sample numbers on Overview, Tenants and Profile.
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
+6. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.
 
 Also worth fixing in the backend: deleting a property leaves its rooms behind. The app avoids the worst case by not deleting anything that still has an active lease.
 
