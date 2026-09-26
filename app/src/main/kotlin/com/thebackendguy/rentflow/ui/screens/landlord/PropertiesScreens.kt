@@ -123,7 +123,7 @@ private fun PropertyCard(property: PropertyDto, portfolio: Portfolio, onClick: (
         Box(Modifier.fillMaxWidth().height(104.dp)) {
             RemoteImage(property.images.firstOrNull()?.url, Modifier.fillMaxSize())
             Pill(
-                propertyTypeLabel(property.propertyType), background = Color.White.copy(alpha = 0.92f), content = Rf.Primary,
+                propertyTypeLabel(property.propertyType), background = Rf.Lowest.copy(alpha = 0.92f), content = Rf.Primary,
                 modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
             )
             Pill(
@@ -273,7 +273,7 @@ private fun PhotoPager(property: PropertyDto) {
             RemoteImage(images.getOrNull(page)?.url, Modifier.fillMaxSize())
         }
         Pill(
-            propertyTypeLabel(property.propertyType), background = Color.White.copy(alpha = 0.92f), content = Rf.Primary,
+            propertyTypeLabel(property.propertyType), background = Rf.Lowest.copy(alpha = 0.92f), content = Rf.Primary,
             modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
         )
         if (images.size > 1) {

@@ -2,9 +2,6 @@ package com.thebackendguy.rentflow.ui.screens.landlord
 
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,7 +73,9 @@ import com.thebackendguy.rentflow.ui.components.Segmented
 import com.thebackendguy.rentflow.ui.components.SwitchRow
 import com.thebackendguy.rentflow.ui.components.TitledCard
 import com.thebackendguy.rentflow.ui.components.Toasts
+import com.thebackendguy.rentflow.ui.components.photoChooser
 import com.thebackendguy.rentflow.ui.components.pressable
+import com.thebackendguy.rentflow.ui.components.rememberPhotoLoad
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.screens.Shell
@@ -349,7 +348,7 @@ fun TenantDetailsScreen(
                         )
                     )
                 }
-                ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Color.White, Modifier.fillMaxWidth(), doneLabel = "Reminder sent")
+                ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Rf.OnSecondary, Modifier.fillMaxWidth(), doneLabel = "Reminder sent")
                 ActionButton("End lease", Lucide.LogOut, Rf.ErrorContainer, Rf.Error, Modifier.fillMaxWidth()) { confirmEnd = true }
             } else {
                 RfCard {
@@ -495,30 +494,37 @@ private fun EditTenantForm(tenant: TenantDto, shell: Shell, onBack: () -> Unit, 
 /** Round photo with a camera button; shows [name]'s initials when there's no photo. */
 @Composable
 internal fun AvatarPicker(name: String, photo: Any?, onPick: (Uri) -> Unit, onRemove: (() -> Unit)?) {
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> if (uri != null) onPick(uri) }
-    val open = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+    val open = photoChooser { uris -> onPick(uris.first()) }
+    // The saved photo's download, so a failed one can say so next to the text
+    val load = rememberPhotoLoad(photo as? String)
     RfCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.size(68.dp).pressable(open)) {
                 when (photo) {
                     null -> PersonAvatar(name.ifBlank { "?" }, null, size = 64.dp)
-                    is String -> PersonAvatar(name, photo, size = 64.dp)
+                    is String -> PersonAvatar(name, photo, size = 64.dp, retryBadge = false, load = load)
                     else -> AsyncImage(
                         model = photo, contentDescription = name, contentScale = ContentScale.Crop,
                         modifier = Modifier.size(64.dp).clip(CircleShape)
                     )
                 }
                 Box(
-                    Modifier.align(Alignment.BottomEnd).size(26.dp).clip(CircleShape).background(Color.White).padding(2.dp)
+                    Modifier.align(Alignment.BottomEnd).size(26.dp).clip(CircleShape).background(Rf.Lowest).padding(2.dp)
                         .clip(CircleShape).background(Rf.Primary),
                     contentAlignment = Alignment.Center
                 ) {
-                    LIcon(Lucide.Camera, size = 14.dp, tint = Color.White)
+                    LIcon(Lucide.Camera, size = 14.dp, tint = Rf.OnPrimary)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Profile photo", style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                Text("Optional. Tap the photo to choose one.", style = RfType.BodySm, color = Rf.OnSurfaceVariant)
+                Text("Optional. Tap the photo to take or choose one.", style = RfType.BodySm, color = Rf.OnSurfaceVariant)
+                if (photo is String && load.failed) {
+                    Row(Modifier.pressable(load::retry), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        LIcon(Lucide.RefreshCw, size = 14.dp, tint = Rf.Error)
+                        Text("Photo didn’t load · Retry", style = RfType.LabelMd, color = Rf.Error)
+                    }
+                }
                 if (photo != null && onRemove != null) {
                     Row(Modifier.pressable(onRemove), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         LIcon(Lucide.X, size = 14.dp, tint = Rf.Error)

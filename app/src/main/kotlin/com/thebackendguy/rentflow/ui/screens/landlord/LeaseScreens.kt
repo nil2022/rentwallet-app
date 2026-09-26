@@ -70,7 +70,7 @@ import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.SectionHead
 import com.thebackendguy.rentflow.ui.components.Caption
 import com.thebackendguy.rentflow.ui.components.TextLink
-import com.thebackendguy.rentflow.ui.components.compositeOverWhite
+import com.thebackendguy.rentflow.ui.components.compositeOverCard
 import com.thebackendguy.rentflow.ui.components.Toasts
 import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.components.softShadow
@@ -515,8 +515,8 @@ private fun RoomPicker(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    LIcon(Lucide.Building2, size = 16.dp, tint = if (on) Color.White else Rf.Primary)
-                    Text(property.propertyName, style = RfType.LabelMd, color = if (on) Color.White else Rf.OnSurface, maxLines = 1)
+                    LIcon(Lucide.Building2, size = 16.dp, tint = if (on) Rf.OnPrimary else Rf.Primary)
+                    Text(property.propertyName, style = RfType.LabelMd, color = if (on) Rf.OnPrimary else Rf.OnSurface, maxLines = 1)
                 }
             }
         }
@@ -551,7 +551,7 @@ private fun RoomOption(room: RoomDto, selected: Boolean, modifier: Modifier, onC
             .pressable(onClick, pressScale = 0.97f)
             .softShadow(shape)
             .clip(shape)
-            .background(if (selected) Rf.PrimaryFixed.copy(alpha = 0.35f).compositeOverWhite() else Rf.Lowest)
+            .background(if (selected) Rf.PrimaryFixed.copy(alpha = 0.35f).compositeOverCard() else Rf.Lowest)
             .border(2.dp, ring, shape)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -633,7 +633,7 @@ fun AssignRoomScreen(roomId: String, shell: Shell, onBack: () -> Unit, onNewTena
 private fun TenantOption(tenant: TenantDto, selected: Boolean, onClick: () -> Unit) {
     RfCard(
         padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-        color = if (selected) Rf.PrimaryFixed.copy(alpha = 0.35f).compositeOverWhite() else Rf.Lowest,
+        color = if (selected) Rf.PrimaryFixed.copy(alpha = 0.35f).compositeOverCard() else Rf.Lowest,
         onClick = onClick
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

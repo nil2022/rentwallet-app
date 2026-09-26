@@ -1,6 +1,10 @@
 package com.thebackendguy.rentflow.ui.components
 
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,7 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -47,9 +54,44 @@ fun Modifier.pressable(
     )
 }
 
-/** The subtle card shadow used across the web's phone screens. */
-fun Modifier.softShadow(shape: Shape, elevation: Dp = 1.dp, color: Color = Rf.Shadow): Modifier =
-    shadow(elevation = elevation, shape = shape, clip = false, ambientColor = color, spotColor = color)
+/** The subtle card shadow used across the web's phone screens; [color] defaults to the theme's shadow. */
+fun Modifier.softShadow(shape: Shape, elevation: Dp = 1.dp, color: Color? = null): Modifier =
+    if (color != null) shadow(elevation = elevation, shape = shape, clip = false, ambientColor = color, spotColor = color)
+    else composed {
+        val themed = Rf.Shadow
+        shadow(elevation = elevation, shape = shape, clip = false, ambientColor = themed, spotColor = themed)
+    }
+
+/**
+ * A light band sliding left to right over the content, over and over, for
+ * something still loading. [band] is the band's width as a share of the
+ * element's; [slant] tilts it (0 is upright).
+ */
+fun Modifier.sweep(
+    color: Color,
+    durationMillis: Int,
+    easing: Easing,
+    band: Float = 1f,
+    slant: Float = 0f
+): Modifier = composed {
+    val progress by rememberInfiniteTransition(label = "sweep").animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis, easing = easing)),
+        label = "sweepX"
+    )
+    drawWithContent {
+        drawContent()
+        val start = progress * size.width + size.width * (1f - band) / 2f
+        drawRect(
+            Brush.linearGradient(
+                colors = listOf(Color.Transparent, color, Color.Transparent),
+                start = Offset(start, 0f),
+                end = Offset(start + size.width * band, size.height * slant)
+            )
+        )
+    }
+}
 
 /** Lets a row scroll edge to edge past its parent's side padding (the web's -mx-4 px-4). */
 fun Modifier.bleed(horizontal: Dp): Modifier = layout { measurable, constraints ->

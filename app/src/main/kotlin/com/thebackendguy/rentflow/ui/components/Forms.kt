@@ -1,9 +1,5 @@
 package com.thebackendguy.rentflow.ui.components
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -350,9 +346,7 @@ const val MAX_PHOTOS = 10
 /** Photo tiles four to a row; the first is the cover. Ends with an "Add" tile. */
 @Composable
 fun PhotoGrid(photos: List<Photo>, onChange: (List<Photo>) -> Unit, max: Int = MAX_PHOTOS) {
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(max)) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) onChange((photos + uris.map { Photo.Picked(it) }).take(max))
-    }
+    val addPhotos = photoChooser(limit = max) { uris -> onChange((photos + uris.map { Photo.Picked(it) }).take(max)) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Photo positions, then null for the "Add" tile
         val cells: List<Int?> = photos.indices.toList() + if (photos.size < max) listOf(null) else emptyList()
@@ -364,7 +358,7 @@ fun PhotoGrid(photos: List<Photo>, onChange: (List<Photo>) -> Unit, max: Int = M
                             Box(
                                 Modifier
                                     .fillMaxSize()
-                                    .pressable({ picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                                    .pressable(addPhotos)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(Rf.Lowest)
                                     .border(1.5.dp, Rf.OutlineVariant, RoundedCornerShape(10.dp)),
@@ -448,7 +442,7 @@ fun FormBar(
         Modifier
             .zIndex(1f)
             .shadow(12.dp, shape, ambientColor = Rf.Shadow, spotColor = Rf.Shadow)
-            .background(Color.White, shape)
+            .background(Rf.Lowest, shape)
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -468,4 +462,5 @@ fun RowDivider() {
 }
 
 /** Soft indigo fill behind pictures that are still loading or missing. */
-val PhotoPlaceholder = Brush.linearGradient(listOf(Color(0xFFC3C0FF), Rf.PrimaryFixed))
+val PhotoPlaceholder: Brush
+    @Composable get() = Brush.linearGradient(listOf(Rf.PrimaryFixedDim, Rf.PrimaryFixed))

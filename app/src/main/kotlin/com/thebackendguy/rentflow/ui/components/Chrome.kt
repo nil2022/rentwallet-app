@@ -1,6 +1,7 @@
 package com.thebackendguy.rentflow.ui.components
 
 import android.app.Activity
+import android.graphics.drawable.ColorDrawable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -45,6 +46,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,8 +58,10 @@ import androidx.core.view.WindowCompat
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.icons.LucideIcon
+import com.thebackendguy.rentflow.ui.theme.LocalRfPalette
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
+import com.thebackendguy.rentflow.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -116,14 +120,28 @@ private fun HeaderClock() {
     }
 }
 
+/** Moon in light mode, sun in dark mode (amber, like the web); switches the theme. */
+@Composable
+private fun ThemeButton() {
+    val dark = LocalRfPalette.current.isDark
+    SquareButton({ ThemeMode.set(!dark) }) {
+        LIcon(
+            if (dark) Lucide.Sun else Lucide.MoonStar,
+            tint = Rf.Amber,
+            contentDescription = if (dark) "Switch to light mode" else "Switch to dark mode"
+        )
+    }
+}
+
 /**
- * The web's phone top bar: menu, clock, notifications and account on the first
+ * The web's phone top bar: menu, clock, notifications, theme and account on the first
  * row; a greeting (or back button and page title) and an optional chip below.
  */
 @Composable
 fun RfTopBar(
     title: String,
-    initials: String,
+    name: String,
+    photo: String?,
     onMenu: () -> Unit,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
@@ -136,7 +154,7 @@ fun RfTopBar(
         modifier
             .zIndex(1f)
             .shadow(3.dp, RectangleShape, ambientColor = Rf.Shadow, spotColor = Rf.Shadow)
-            .background(Color.White.copy(alpha = 0.97f))
+            .background(Rf.Lowest.copy(alpha = 0.97f))
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -161,7 +179,7 @@ fun RfTopBar(
                                 .padding(horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = notices.size.toString(), style = RfType.LabelSm.copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.sp), color = Color.White)
+                            Text(text = notices.size.toString(), style = RfType.LabelSm.copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.sp), color = Rf.OnError)
                         }
                     }
                     DropdownMenu(expanded = showNotices, onDismissRequest = { showNotices = false }) {
@@ -181,8 +199,9 @@ fun RfTopBar(
                         }
                     }
                 }
+                ThemeButton()
                 SquareButton(onProfile, Modifier) {
-                    Avatar(initials, background = Rf.PrimaryFixed, content = Rf.Primary, online = true)
+                    PersonAvatar(name, photo, size = 36.dp, online = true)
                 }
             }
         }
@@ -222,7 +241,7 @@ fun RfBottomNav(tabs: List<NavTab>, selected: Int, onSelect: (Int) -> Unit) {
         Modifier
             .zIndex(1f)
             .shadow(6.dp, RectangleShape, ambientColor = Rf.Shadow, spotColor = Rf.Shadow)
-            .background(Color.White.copy(alpha = 0.97f))
+            .background(Rf.Lowest.copy(alpha = 0.97f))
             .navigationBarsPadding()
             .fillMaxWidth()
             .height(64.dp)
@@ -348,15 +367,20 @@ fun AuthShell(
     }
 }
 
-/** Light or dark status-bar icons for the current screen. */
+/**
+ * Light or dark status- and navigation-bar icons for the current screen, and
+ * the window colour that shows between screens.
+ */
 @Composable
-fun StatusBarIcons(darkIcons: Boolean) {
+fun SystemBars(darkIcons: Boolean, background: Color) {
     val view = LocalView.current
     if (view.isInEditMode) return
-    DisposableEffect(darkIcons) {
+    DisposableEffect(darkIcons, background) {
         val window = (view.context as Activity).window
         val controller = WindowCompat.getInsetsController(window, view)
         controller.isAppearanceLightStatusBars = darkIcons
+        controller.isAppearanceLightNavigationBars = darkIcons
+        window.setBackgroundDrawable(ColorDrawable(background.toArgb()))
         onDispose { }
     }
 }

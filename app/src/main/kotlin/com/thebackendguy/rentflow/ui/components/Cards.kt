@@ -18,6 +18,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.icons.LucideIcon
+import com.thebackendguy.rentflow.ui.theme.LightPalette
+import com.thebackendguy.rentflow.ui.theme.LocalRfPalette
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 
@@ -47,6 +51,8 @@ fun soft(alpha: Float) = Color(0xFFD3E4FE).copy(alpha = alpha)
 @Composable
 fun DarkCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(12.dp)
+    val glow = Rf.Primary
+    val mintGlow = Rf.Secondary
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -56,7 +62,7 @@ fun DarkCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
             .drawBehind {
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Rf.Primary.copy(alpha = 0.35f), Color.Transparent),
+                        colors = listOf(glow.copy(alpha = 0.35f), Color.Transparent),
                         center = Offset(size.width - 48.dp.toPx(), 48.dp.toPx()),
                         radius = 150.dp.toPx()
                     ),
@@ -65,7 +71,7 @@ fun DarkCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Rf.Secondary.copy(alpha = 0.22f), Color.Transparent),
+                        colors = listOf(mintGlow.copy(alpha = 0.22f), Color.Transparent),
                         center = Offset(40.dp.toPx(), size.height - 40.dp.toPx()),
                         radius = 120.dp.toPx()
                     ),
@@ -76,7 +82,8 @@ fun DarkCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CompositionLocalProvider(LocalContentColor provides Rf.InverseOnSurface) { content() }
+        // The card is the same navy in both themes, so what's on it keeps its light-theme colours
+        CompositionLocalProvider(LocalContentColor provides Rf.InverseOnSurface, LocalRfPalette provides LightPalette) { content() }
     }
 }
 
@@ -202,22 +209,23 @@ data class HealthTileSpec(
     val tileBg: Color,
     val iconColor: Color,
     val badgeColor: Color,
-    val background: Color = Rf.Lowest,
-    val titleColor: Color = Rf.OnSurface,
-    val subColor: Color = Rf.OnSurfaceVariant
+    // null for the usual card, title and caption colours
+    val background: Color? = null,
+    val titleColor: Color? = null,
+    val subColor: Color? = null
 )
 
 @Composable
 fun HealthTile(spec: HealthTileSpec, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
-    Column(modifier.softShadow(shape).clip(shape).background(spec.background).padding(14.dp)) {
+    Column(modifier.softShadow(shape).clip(shape).background(spec.background ?: Rf.Lowest).padding(14.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconTile(spec.icon, background = spec.tileBg, tint = spec.iconColor)
             Text(text = spec.badge, style = RfType.LabelSm, color = spec.badgeColor)
         }
-        Text(text = spec.title, style = RfType.HeadlineSm, color = spec.titleColor, modifier = Modifier.padding(top = 12.dp), maxLines = 1)
+        Text(text = spec.title, style = RfType.HeadlineSm, color = spec.titleColor ?: Rf.OnSurface, modifier = Modifier.padding(top = 12.dp), maxLines = 1)
         Text(
-            text = spec.sub, style = RfType.LabelSm, color = spec.subColor, maxLines = 1,
+            text = spec.sub, style = RfType.LabelSm, color = spec.subColor ?: Rf.OnSurfaceVariant, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)
         )
     }
@@ -254,7 +262,7 @@ fun LedgerCard(
     val accent = when (tone) { LedgerTone.Late -> Rf.Error; LedgerTone.Due -> Rf.Primary; LedgerTone.Settled -> Rf.Secondary }
     RfCard(
         modifier = modifier,
-        color = if (late) Rf.ErrorWash.compositeOverWhite() else Rf.Lowest,
+        color = if (late) Rf.ErrorWash.compositeOverCard() else Rf.Lowest,
         padding = PaddingValues(14.dp),
         spacing = 8.dp,
         onClick = onClick
@@ -424,9 +432,7 @@ fun DashedDivider(modifier: Modifier = Modifier, color: Color = Rf.Container) {
     )
 }
 
-/** Blend a translucent tint over white, so a tinted card stays opaque over its shadow. */
-fun Color.compositeOverWhite(): Color = Color(
-    red = red * alpha + (1 - alpha),
-    green = green * alpha + (1 - alpha),
-    blue = blue * alpha + (1 - alpha)
-)
+/** Blend a translucent tint over the card colour, so a tinted card stays opaque over its shadow. */
+@Composable
+@ReadOnlyComposable
+fun Color.compositeOverCard(): Color = compositeOver(Rf.Lowest)

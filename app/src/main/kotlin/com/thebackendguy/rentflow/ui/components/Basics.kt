@@ -142,7 +142,7 @@ fun Avatar(
                     .size(dot)
                     .clip(CircleShape)
                     .background(Rf.Online)
-                    .border(2.dp, Color.White, CircleShape)
+                    .border(2.dp, Rf.Lowest, CircleShape)
             )
         }
     }

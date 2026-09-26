@@ -125,7 +125,7 @@ fun QuickActions(actions: List<QuickAction>) {
         ) {
             actions.forEach { action ->
                 val (bg, fg, iconTint) = when (action.tone) {
-                    QuickTone.Primary -> Triple(Rf.Primary, Color.White, Color.White)
+                    QuickTone.Primary -> Triple(Rf.Primary, Rf.OnPrimary, Rf.OnPrimary)
                     QuickTone.Secondary -> Triple(Rf.SecondaryContainer, Rf.OnSecondaryContainer, Rf.OnSecondaryContainer)
                     QuickTone.Surface -> Triple(Rf.Lowest, Rf.OnSurface, Rf.Primary)
                     QuickTone.Low -> Triple(Rf.Low, Rf.OnSurfaceVariant, Rf.Tertiary)

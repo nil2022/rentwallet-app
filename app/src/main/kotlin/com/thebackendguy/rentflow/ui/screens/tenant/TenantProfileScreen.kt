@@ -16,7 +16,7 @@ import com.thebackendguy.rentflow.ui.screens.Shell
 @Composable
 fun TenantProfileScreen(user: SessionUser?, shell: Shell, onLogout: () -> Unit) {
     AppPage(topBar = { shell.TopBar("Profile") }, bottomBar = { shell.BottomNav(2) }) {
-        ProfileHeader(user?.initials.orEmpty(), user?.name.orEmpty(), "Tenant • ${Demo.PROPERTY}")
+        ProfileHeader(user?.name.orEmpty(), user?.photo, "Tenant • ${Demo.PROPERTY}")
         TitledCard("Personal details") {
             IconRows(
                 listOf(

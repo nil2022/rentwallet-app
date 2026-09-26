@@ -146,7 +146,7 @@ fun LandlordOverviewScreen(
                     ) {
                         if (urgent) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Color.White, Modifier.weight(1f), doneLabel = "Reminder sent")
+                                ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Rf.OnSecondary, Modifier.weight(1f), doneLabel = "Reminder sent")
                                 ActionButton("Log offline", Lucide.ReceiptText, Rf.Container, Rf.OnSurfaceVariant, Modifier.weight(1f), doneLabel = "Logged")
                             }
                         } else {
@@ -212,6 +212,7 @@ internal fun TenantLedgerCard(tenant: Tenant, onClick: () -> Unit) {
 
 
 /** The four portfolio tiles from real data; dashes while it loads. */
+@Composable
 private fun portfolioTiles(portfolio: Portfolio?): List<HealthTileSpec> {
     if (portfolio == null) {
         return listOf(

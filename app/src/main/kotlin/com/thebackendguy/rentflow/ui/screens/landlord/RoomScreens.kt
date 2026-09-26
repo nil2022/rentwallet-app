@@ -123,7 +123,7 @@ fun RoomDetailsScreen(
                         Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(6.dp))
                             .background(Rf.InverseSurface.copy(alpha = 0.85f)).padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text("Monthly rent", style = RfType.LabelSm, color = Rf.Highest.copy(alpha = 0.8f))
+                        Text("Monthly rent", style = RfType.LabelSm, color = Rf.InverseOnSurface.copy(alpha = 0.8f))
                         Text(inr(room.rent), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.Bold), color = Color.White)
                     }
                 }

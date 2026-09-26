@@ -51,9 +51,9 @@ fun PrimaryButton(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (loading) Spinner(Color.White)
-        Text(text = text, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
-        if (showArrow && !loading) LIcon(Lucide.ArrowRight, size = 18.dp, tint = Color.White)
+        if (loading) Spinner(Rf.OnPrimary)
+        Text(text = text, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnPrimary)
+        if (showArrow && !loading) LIcon(Lucide.ArrowRight, size = 18.dp, tint = Rf.OnPrimary)
     }
 }
 

@@ -56,6 +56,14 @@ object Network {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
     }
+
+    /** For downloading photos: the same patience as API calls, for weak mobile signal. */
+    val images: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
 }
 
 sealed interface ApiResult<out T> {

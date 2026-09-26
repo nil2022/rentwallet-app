@@ -9,9 +9,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.thebackendguy.rentflow.data.UserRole
-import com.thebackendguy.rentflow.ui.components.Avatar
 import com.thebackendguy.rentflow.ui.components.NavTab
 import com.thebackendguy.rentflow.ui.components.Notice
+import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.RfBottomNav
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTopBar
@@ -32,7 +32,8 @@ val LandlordTabs = listOf(
 /** Top bar and bottom tabs for one signed-in role, so every screen builds them the same way. */
 class Shell(
     private val role: UserRole,
-    private val initials: String,
+    private val name: String,
+    private val photo: String?,
     private val notices: List<Notice>,
     private val onMenu: () -> Unit,
     private val onProfile: () -> Unit,
@@ -42,7 +43,8 @@ class Shell(
     fun TopBar(title: String, onBack: (() -> Unit)? = null, chip: String? = null) {
         RfTopBar(
             title = title,
-            initials = initials,
+            name = name,
+            photo = photo,
             onMenu = onMenu,
             onBack = onBack,
             chip = chip,
@@ -58,10 +60,10 @@ class Shell(
 }
 
 @Composable
-fun ProfileHeader(initials: String, name: String, sub: String) {
+fun ProfileHeader(name: String, photo: String?, sub: String) {
     RfCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Avatar(initials, background = Rf.PrimaryFixed, content = Rf.Primary, size = 64.dp, style = RfType.HeadlineMd.copy(fontSize = RfType.HeadlineMd.fontSize), online = true)
+            PersonAvatar(name, photo, size = 64.dp, online = true)
             Column(Modifier.weight(1f)) {
                 Text(name, style = RfType.HeadlineSm, color = Rf.OnSurface)
                 Text(sub, style = RfType.LabelSm, color = Rf.OnSurfaceVariant)

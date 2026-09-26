@@ -1,41 +1,30 @@
 package com.thebackendguy.rentflow.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.SubcomposeAsyncImage
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.icons.LucideIcon
@@ -44,39 +33,49 @@ import com.thebackendguy.rentflow.ui.theme.RfType
 
 /* ------------------------------ Loading ------------------------------ */
 
-/** Grey block with a moving shine, where content will appear. */
+/**
+ * Block where content will appear: it pulses and a light band sweeps across
+ * it, like the loading cards in the Stitch design.
+ */
 @Composable
-fun Skeleton(modifier: Modifier = Modifier, radius: Dp = 8.dp) {
-    val shift by rememberInfiniteTransition(label = "skeleton").animateFloat(
-        initialValue = -1f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
-        label = "skeletonShift"
-    )
+fun Skeleton(modifier: Modifier = Modifier, radius: Dp = 8.dp, color: Color = Rf.Container) {
+    val alpha = pulseAlpha()
     Box(
         modifier
+            .graphicsLayer { this.alpha = alpha }
             .clip(RoundedCornerShape(radius))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(Rf.Low, Color(0xFFF7F9FF), Rf.Low),
-                    start = Offset(shift * 600f, 0f),
-                    end = Offset(shift * 600f + 600f, 0f)
-                )
-            )
+            .background(color)
+            .loadingSweep()
     )
 }
 
-/** Placeholder cards while a list loads for the first time. */
+/**
+ * Placeholder cards while a list loads for the first time: a photo block when
+ * [imageHeight] is set, a title and line on the left, two short lines on the
+ * right, and a pulsing hourglass.
+ */
 @Composable
 fun LoadingCards(count: Int = 3, imageHeight: Dp = 0.dp) {
+    val hourglass = pulseAlpha()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         repeat(count) {
             RfCard(padding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
                 if (imageHeight > 0.dp) Skeleton(Modifier.fillMaxWidth().height(imageHeight), radius = 0.dp)
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Skeleton(Modifier.fillMaxWidth(0.6f).height(16.dp))
-                    Skeleton(Modifier.fillMaxWidth(0.4f).height(12.dp))
-                    Skeleton(Modifier.fillMaxWidth().height(8.dp))
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Skeleton(Modifier.fillMaxWidth(0.62f).height(18.dp))
+                            Skeleton(Modifier.fillMaxWidth(0.88f).height(12.dp), radius = 5.dp, color = Rf.Low)
+                        }
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Skeleton(Modifier.width(70.dp).height(18.dp))
+                            Skeleton(Modifier.width(44.dp).height(10.dp), radius = 5.dp, color = Rf.Low)
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        LIcon(Lucide.Hourglass, size = 14.dp, tint = Rf.Primary, modifier = Modifier.graphicsLayer { alpha = hourglass })
+                        Skeleton(Modifier.fillMaxWidth(0.45f).height(10.dp), radius = 5.dp, color = Rf.Low)
+                    }
                 }
             }
         }
@@ -117,8 +116,8 @@ fun EmptyState(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                LIcon(actionIcon, size = 18.dp, tint = Color.White)
-                Text(actionLabel, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
+                LIcon(actionIcon, size = 18.dp, tint = Rf.OnPrimary)
+                Text(actionLabel, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnPrimary)
             }
         }
     }
@@ -158,8 +157,8 @@ fun Fab(label: String, icon: LucideIcon, onClick: () -> Unit, modifier: Modifier
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        LIcon(icon, size = 20.dp, tint = Color.White)
-        Text(label, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
+        LIcon(icon, size = 20.dp, tint = Rf.OnPrimary)
+        Text(label, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnPrimary)
     }
 }
 
@@ -207,62 +206,7 @@ private fun DangerButton(text: String, busy: Boolean, onClick: () -> Unit, modif
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (busy) Spinner(Color.White)
-        Text(text, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Color.White)
-    }
-}
-
-/* ------------------------------ Pictures ------------------------------ */
-
-/**
- * A photo from a URL or a picked file. While it loads, or if there is none,
- * the soft indigo placeholder with [placeholderIcon] shows instead.
- */
-@Composable
-fun RemoteImage(model: Any?, modifier: Modifier = Modifier, placeholderIcon: LucideIcon = Lucide.Building2, iconSize: Dp = 36.dp) {
-    val placeholder = @Composable {
-        Box(Modifier.fillMaxSize().background(PhotoPlaceholder), contentAlignment = Alignment.Center) {
-            LIcon(placeholderIcon, size = iconSize, tint = Rf.Primary.copy(alpha = 0.5f))
-        }
-    }
-    if (model == null) {
-        Box(modifier) { placeholder() }
-        return
-    }
-    SubcomposeAsyncImage(
-        model = model,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier,
-        loading = { placeholder() },
-        error = { placeholder() }
-    )
-}
-
-/** Round photo, or initials when there is none. */
-@Composable
-fun PersonAvatar(
-    name: String,
-    photoUrl: String?,
-    size: Dp,
-    background: Color = Rf.PrimaryFixed,
-    content: Color = Rf.Primary
-) {
-    val initials = name.trim().split(Regex("\\s+")).filter(String::isNotEmpty).take(2)
-        .joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
-    if (photoUrl.isNullOrBlank()) {
-        Avatar(initials, background = background, content = content, size = size,
-            style = if (size >= 56.dp) RfType.HeadlineMd else RfType.LabelMd.copy(fontWeight = FontWeight.Bold))
-    } else {
-        Box(Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape)) {
-            SubcomposeAsyncImage(
-                model = photoUrl,
-                contentDescription = name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = { Avatar(initials, background = background, content = content, size = size) },
-                error = { Avatar(initials, background = background, content = content, size = size) }
-            )
-        }
+        if (busy) Spinner(Rf.OnError)
+        Text(text, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnError)
     }
 }

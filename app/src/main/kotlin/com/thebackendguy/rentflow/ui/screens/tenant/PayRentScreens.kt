@@ -65,7 +65,7 @@ fun PayRentScreen(payment: RentPayment, shell: Shell, onBack: () -> Unit, onConf
                 Modifier
                     .zIndex(1f)
                     .shadow(12.dp, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp), ambientColor = Rf.Shadow, spotColor = Rf.Shadow)
-                    .background(Color.White, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                    .background(Rf.Lowest, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
