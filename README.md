@@ -27,12 +27,14 @@
 
 The screenshots are rendered from the approved design mockups the app was built from, with example names and numbers. The numbers match the screen numbers used during design review.
 
-### Welcome and sign-in
+### Sign-in
 
-| 01 Welcome | 02 Login: Tenant | 02 Login: Landlord | 02 Login: One-time code |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-welcome.png" width="170" alt="Welcome screen"> | <img src="docs/screenshots/02-login-tenant.png" width="170" alt="Tenant login"> | <img src="docs/screenshots/02-login-landlord.png" width="170" alt="Landlord login"> | <img src="docs/screenshots/02-login-otp.png" width="170" alt="Login with one-time code"> |
-| Pick Tenant or Landlord, or tap Sign In. | One login for both roles. Email and password, with “Remember for 30 days”. | The switch changes the headline, subtitle and the “Register here” link. | “Login with OTP instead” emails a 6-digit code. Resend unlocks after 60 seconds. |
+The app opens on Login, on the role used for the last sign-in (Landlord the first time). It comes back here after logging out.
+
+| 02 Login: Tenant | 02 Login: Landlord | 02 Login: One-time code |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/02-login-tenant.png" width="170" alt="Tenant login"> | <img src="docs/screenshots/02-login-landlord.png" width="170" alt="Landlord login"> | <img src="docs/screenshots/02-login-otp.png" width="170" alt="Login with one-time code"> |
+| One login for both roles. Email and password, with “Remember for 30 days”. | The switch changes the headline, subtitle and the “Register here” link. | “Login with OTP instead” emails a 6-digit code. Resend unlocks after 60 seconds. |
 
 A wrong password or code floats up from the bottom as a red note. Buttons show a spinner while a request runs.
 
@@ -103,8 +105,7 @@ The tenant’s rent screens use sample data until the tenant payment and lease A
 
 ```mermaid
 flowchart TD
-    W["01 Welcome"] -->|"Tenant or Landlord card"| L["02 Login"]
-    W -->|"Sign In"| L
+    S(["App opens"]) --> L["02 Login"]
     L -->|"Forgot Password?"| F1["14 Forgot password"]
     F1 --> F2["14 Code and new password"] --> F3["14 Password reset"] --> L
     L -->|"Register here (landlord)"| R1["15 Register"] --> R2["15 Verify email"]
@@ -150,8 +151,9 @@ flowchart TD
 How navigation works:
 
 - **Bottom tabs.** Tenants have Home, Payments and Profile. Landlords have Overview, Properties, Tenants and Profile.
-- **Top bar.** The menu button opens a side drawer with the same tabs and Log out. The bell lists alerts. The avatar opens Profile. Inner screens show a back arrow and the screen title.
-- **Back button.** Screens form a stack, so Back returns to the screen you came from. A tab goes back to the home screen; on a home screen or Welcome, Back leaves the app.
+- **Top bar.** The menu button opens the side drawer. The bell lists alerts, the moon/sun button switches the theme, and your photo opens Profile. Inner screens show a back arrow and the screen title.
+- **Side drawer.** As on the web: 260 dp wide (at most 85% of the screen) and navy in both themes, with the logo, the same tabs as the bottom bar, and a card with your photo, name and role that opens Profile. Log out is the icon on that card.
+- **Back button.** Screens form a stack, so Back returns to the screen you came from. A tab goes back to the home screen; on a home screen or Login, Back leaves the app.
 - **Staying signed in.** With “Remember for 30 days”, the app opens signed in next time. Without it, the session ends when the app closes. If the server rejects the saved session, the app returns to login and says why.
 
 ## What uses real data
@@ -183,7 +185,7 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Secondary container | `#82F5C1` | | On surface variant | `#464555` |
 | Error | `#BA1A1A` | | Inverse surface (dark cards) | `#213145` |
 
-**Dark theme.** The moon/sun button in the top bar switches the signed-in screens between light and dark. Dark uses the web’s dark phone palette (surface `#0C1424`, cards `#152036`, primary `#AEB0FF`, success `#68DBA9`, error `#FFB4AB`). Until the user picks one, the app follows the phone’s setting, and the choice is kept after logging out. The welcome and sign-in screens stay light, as on the web, and the navy summary cards look the same in both themes.
+**Dark theme.** The moon/sun button in the top bar (and next to the logo on the sign-in screens) switches the whole app between light and dark. Dark uses the web’s dark phone palette (surface `#0C1424`, cards `#152036`, primary `#AEB0FF`, success `#68DBA9`, error `#FFB4AB`). Until the user picks one, the app follows the phone’s setting, and the choice is kept after logging out. The launch screen matches too: dark when the phone is in dark mode, and on Android 12+ in whichever theme was picked last. The navy summary cards and the side drawer look the same in both themes.
 
 **Type.** Plus Jakarta Sans, with the web’s phone type scale ([`Type.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Type.kt)):
 
@@ -202,7 +204,9 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 
 **Components.** Cards with 12 dp corners and a soft shadow, dark summary cards, pill-shaped filters with a sliding thumb, quick-action chips that scroll sideways, and a bottom bar with the Material 3 pill indicator. Forms use choice chips, switches, steppers, dropdowns, a date picker and a photo grid, with the save button in a bar pinned to the bottom. Buttons shrink slightly when pressed instead of showing a ripple, as on the web.
 
-**Photos on a slow network.** Photos can be taken with the camera or picked from the gallery. While a property or room photo downloads, its indigo placeholder shows a light band sliding across it; the photo then fades in, and if it can’t be fetched the placeholder offers “Tap to retry”. Profile photos show the Stitch design’s Wave Sweep (a ring of colour, a pulse, a sweep and a camera icon) and fall back to the person’s initials, with a retry button on the larger ones. Lists that load for the first time show pulsing placeholder cards. Photos already downloaded are kept on the phone and show without a network.
+**Photo crop and preview.** Photos can be taken with the camera or picked from the gallery, and each one opens in a crop screen first: move and pinch the photo under a frame with a 3×3 grid, pick Original, 4:3, 16:9 or 1:1, and rotate it a quarter turn at a time. Several photos are cropped one by one, or added as they are with “Use all as they are”. Profile photos are cropped in a round 1:1 frame. Tapping a photo in a form opens it full screen: swipe between photos, pinch or double-tap to zoom, and Crop (new photos), Make cover or Remove. New photos are copied into the app’s own folder straight away, so they survive Android closing the app while the camera is open.
+
+**Photos on a slow network.** While a property or room photo downloads, its indigo placeholder shows a light band sliding across it; the photo then fades in, and if it can’t be fetched the placeholder offers “Tap to retry”. Profile photos show the Stitch design’s Wave Sweep (a ring of colour, a pulse, a sweep and a camera icon) and fall back to the person’s initials, with a retry button on the larger ones. Lists that load for the first time show pulsing placeholder cards. Photos already downloaded are kept on the phone and show without a network.
 
 ## Tech stack
 
@@ -235,16 +239,17 @@ app/src/main/
 │   └── ui/
 │       ├── theme/                # Light and dark colours, type, theme switch
 │       ├── icons/                # Lucide.kt (generated), LucideIcon.kt
-│       ├── components/           # Cards, buttons, fields, forms, states, photos and loaders, camera/gallery picker, page frames
+│       ├── components/           # Cards, buttons, fields, forms, states, side drawer, photos: loaders, picker, crop, preview
 │       └── screens/
-│           ├── Shell.kt          # Top bar and tabs per role, profile header, log out button
-│           ├── auth/             # Welcome, Login, Forgot Password, Register
+│           ├── Shell.kt          # Top bar and tabs per role, profile header, log out button (drawer in components/Drawer.kt)
+│           ├── auth/             # Login, Forgot Password, Register
 │           ├── tenant/           # Home, Pay Rent, Payment Success, History, Receipt, Profile
 │           └── landlord/         # Overview, Properties, Rooms, Tenants, leases, Profile
 ├── res/
 │   ├── font/plus_jakarta_sans.ttf
 │   ├── drawable/                 # Launcher icon layers
-│   ├── xml/                      # Network security, FileProvider paths for camera photos
+│   ├── xml/                      # Network security, FileProvider paths for new photos
+│   ├── values-night/             # Dark launch-screen background
 │   └── values/                   # App name, colours, window theme
 └── assets/licenses/OFL-PlusJakartaSans.txt
 ```
