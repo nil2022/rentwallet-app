@@ -46,6 +46,16 @@ object Network {
     }
 
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
+    val landlord: LandlordApi by lazy { retrofit.create(LandlordApi::class.java) }
+
+    /** For file storage: it rejects requests that carry our Authorization header. */
+    val storage: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
 }
 
 sealed interface ApiResult<out T> {

@@ -22,7 +22,12 @@ import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
 
 val TenantTabs = listOf(NavTab("Home", Lucide.House), NavTab("Payments", Lucide.History), NavTab("Profile", Lucide.User))
-val LandlordTabs = listOf(NavTab("Overview", Lucide.LayoutDashboard), NavTab("Tenants", Lucide.Users), NavTab("Profile", Lucide.User))
+val LandlordTabs = listOf(
+    NavTab("Overview", Lucide.LayoutDashboard),
+    NavTab("Properties", Lucide.Building2),
+    NavTab("Tenants", Lucide.Users),
+    NavTab("Profile", Lucide.User)
+)
 
 /** Top bar and bottom tabs for one signed-in role, so every screen builds them the same way. */
 class Shell(

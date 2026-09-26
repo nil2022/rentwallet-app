@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -20,6 +21,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.thebackendguy.myandroidtestapp.data.Demo
+import com.thebackendguy.myandroidtestapp.data.LandlordStore
+import com.thebackendguy.myandroidtestapp.data.Portfolio
+import com.thebackendguy.myandroidtestapp.data.apiDate
+import com.thebackendguy.myandroidtestapp.data.monthLabel
 import com.thebackendguy.myandroidtestapp.data.PayStatus
 import com.thebackendguy.myandroidtestapp.data.Tenant
 import com.thebackendguy.myandroidtestapp.data.inr
@@ -49,17 +54,26 @@ import com.thebackendguy.myandroidtestapp.ui.icons.Lucide
 import com.thebackendguy.myandroidtestapp.ui.screens.Shell
 import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
+import java.time.LocalDate
 
 private const val WITHDRAWAL = 15_000
 
+/**
+ * The landlord's home. Portfolio health counts real properties, tenants and
+ * rooms; the collections card, needs-attention cards and payment ledger are
+ * sample data ([tenants]) until the payments API exists.
+ */
 @Composable
 fun LandlordOverviewScreen(
     firstName: String,
     tenants: List<Tenant>,
     shell: Shell,
     onOpenTenants: () -> Unit,
-    onOpenTenant: (Int) -> Unit
+    onAddProperty: () -> Unit,
+    onAddTenant: () -> Unit
 ) {
+    val portfolio = portfolioState().data
+    LaunchedEffect(Unit) { LandlordStore.refresh() }
     var filter by rememberSaveable { mutableIntStateOf(0) }
     val paid = tenants.filter { it.status == PayStatus.Paid }
     val pending = tenants.filter { it.status != PayStatus.Paid }
@@ -68,7 +82,12 @@ fun LandlordOverviewScreen(
     val percent = if (tenants.isEmpty()) 0 else paid.size * 100 / tenants.size
 
     AppPage(
-        topBar = { shell.TopBar(if (firstName.isEmpty()) "Hello 👋" else "Hello, $firstName 👋", chip = "${tenants.size} properties") },
+        topBar = {
+            shell.TopBar(
+                if (firstName.isEmpty()) "Hello 👋" else "Hello, $firstName 👋",
+                chip = portfolio?.properties?.size?.let { "$it ${if (it == 1) "property" else "properties"}" }
+            )
+        },
         bottomBar = { shell.BottomNav(0) }
     ) {
         DarkCard {
@@ -93,30 +112,19 @@ fun LandlordOverviewScreen(
             }
         }
 
-        // Record, remind, withdraw and add are placeholders until the API exists, as on the web
+        // Adding is live; recording payments and reminders wait for the payments API, as on the web
         QuickActions(
             listOf(
-                QuickAction("+ Record payment", Lucide.CirclePlus, QuickTone.Primary) {},
-                QuickAction("Send reminders", Lucide.MessageCircle, QuickTone.Secondary) {},
-                QuickAction("Withdraw", Lucide.Banknote, QuickTone.Surface) {},
-                QuickAction("Add tenant", Lucide.UserPlus, QuickTone.Low) {}
+                QuickAction("Add property", Lucide.Building2, QuickTone.Primary, onAddProperty),
+                QuickAction("Add tenant", Lucide.UserPlus, QuickTone.Secondary, onAddTenant),
+                QuickAction("Record payment", Lucide.CirclePlus, QuickTone.Surface) {},
+                QuickAction("Send reminders", Lucide.MessageCircle, QuickTone.Low) {}
             )
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHead("Portfolio health") { Caption("May cycle") }
-            HealthTiles(
-                listOf(
-                    HealthTileSpec(Lucide.Building2, "Active", "${tenants.size} Properties", "Salt Lake, New Town +3", Rf.High, Rf.Primary, Rf.Secondary),
-                    HealthTileSpec(Lucide.Users, "100%", "${tenants.size} Tenants", "Every property let", Rf.MintSoft, Rf.Secondary, Rf.Secondary),
-                    HealthTileSpec(
-                        Lucide.TriangleAlert, "Attention", "${pending.size} Pending", pending.joinToString(" and ") { it.shortDate }.let { "Due $it" },
-                        Rf.ErrorContainer, Rf.Error, Rf.Error,
-                        background = Rf.ErrorSoft.compositeOverSurface(), titleColor = Rf.OnErrorContainer, subColor = Rf.OnErrorContainer
-                    ),
-                    HealthTileSpec(Lucide.CalendarClock, "Sep 2026", "1 Lease ending", "Sunrise Enclave • 30 Sep", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High)
-                )
-            )
+            SectionHead("Portfolio health") { Caption("From your properties") }
+            HealthTiles(portfolioTiles(portfolio))
         }
 
         if (pending.isNotEmpty()) {
@@ -160,7 +168,7 @@ fun LandlordOverviewScreen(
             Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 tenants.withIndex()
                     .filter { (_, t) -> filter == 0 || (filter == 1) == (t.status == PayStatus.Paid) }
-                    .forEach { (index, tenant) -> TenantLedgerCard(tenant) { onOpenTenant(index) } }
+                    .forEach { (_, tenant) -> TenantLedgerCard(tenant, onOpenTenants) }
             }
         }
 
@@ -202,9 +210,54 @@ internal fun TenantLedgerCard(tenant: Tenant, onClick: () -> Unit) {
     }
 }
 
-/** Blend a translucent tint over the page surface. */
-private fun Color.compositeOverSurface(): Color = Color(
-    red = red * alpha + Rf.Surface.red * (1 - alpha),
-    green = green * alpha + Rf.Surface.green * (1 - alpha),
-    blue = blue * alpha + Rf.Surface.blue * (1 - alpha)
-)
+
+/** The four portfolio tiles from real data; dashes while it loads. */
+private fun portfolioTiles(portfolio: Portfolio?): List<HealthTileSpec> {
+    if (portfolio == null) {
+        return listOf(
+            HealthTileSpec(Lucide.Building2, "", "— Properties", "Loading…", Rf.High, Rf.Primary, Rf.Secondary),
+            HealthTileSpec(Lucide.Users, "", "— Tenants", "Loading…", Rf.MintSoft, Rf.Secondary, Rf.Secondary),
+            HealthTileSpec(Lucide.DoorOpen, "", "— Rooms", "Loading…", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High),
+            HealthTileSpec(Lucide.CalendarClock, "", "— Leases", "Loading…", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High)
+        )
+    }
+    val properties = portfolio.properties
+    val cities = properties.map { it.city }.filter(String::isNotBlank).distinct()
+    val leased = portfolio.tenants.count { it.lease != null }
+    val noRoom = portfolio.tenants.size - leased
+    val vacant = portfolio.allRooms.count { portfolio.occupants(it.id).isEmpty() }
+    // Leases that end within the next two months, soonest first
+    val today = LocalDate.now()
+    val ending = portfolio.tenants
+        .mapNotNull { t -> t.lease?.let { lease -> apiDate(lease.endDate)?.let { end -> Triple(t, lease, end) } } }
+        .filter { (_, _, end) -> !end.isBefore(today) && end.isBefore(today.plusMonths(2)) }
+        .sortedBy { it.third }
+    val next = ending.firstOrNull()
+
+    return listOf(
+        HealthTileSpec(
+            Lucide.Building2, "Active", "${properties.size} ${if (properties.size == 1) "Property" else "Properties"}",
+            when {
+                cities.isEmpty() -> "Add your first property"
+                cities.size <= 2 -> cities.joinToString(", ")
+                else -> "${cities.take(2).joinToString(", ")} +${cities.size - 2}"
+            },
+            Rf.High, Rf.Primary, Rf.Secondary
+        ),
+        HealthTileSpec(
+            Lucide.Users, if (noRoom > 0) "$noRoom no room" else "All housed", "${portfolio.tenants.size} Tenants",
+            "$leased with a lease", Rf.MintSoft, Rf.Secondary, if (noRoom > 0) Rf.OnSurfaceVariant else Rf.Secondary
+        ),
+        HealthTileSpec(
+            Lucide.DoorOpen, "Vacant", "$vacant ${if (vacant == 1) "Room" else "Rooms"}",
+            if (vacant == 0) "Every room is let" else "Ready to let", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High
+        ),
+        HealthTileSpec(
+            Lucide.CalendarClock, next?.third?.monthLabel() ?: "Next 60 days",
+            if (ending.isEmpty()) "No leases ending" else "${ending.size} Lease ending",
+            next?.second?.let { lease -> listOfNotNull(lease.property?.propertyName, lease.room?.roomNumber?.let { "Room $it" }).joinToString(" • ") }
+                ?: "Nothing to renew soon",
+            Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High
+        )
+    )
+}

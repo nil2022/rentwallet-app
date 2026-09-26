@@ -13,7 +13,8 @@ data class SessionUser(
     val role: UserRole,
     val name: String,
     val email: String,
-    val mobile: String?
+    val mobile: String?,
+    val photo: String? = null
 ) {
     val firstName: String get() = name.trim().substringBefore(' ').ifEmpty { "there" }
 
@@ -29,7 +30,8 @@ data class SessionUser(
 
 data class Session(val token: String, val user: SessionUser)
 
-fun UserDto.toSessionUser(role: UserRole) = SessionUser(id = id, role = role, name = fullName, email = email, mobile = mobile)
+fun UserDto.toSessionUser(role: UserRole) =
+    SessionUser(id = id, role = role, name = fullName, email = email, mobile = mobile, photo = profilePic?.takeIf(String::isNotBlank))
 
 /**
  * The signed-in account and its token. With "Remember me" it's saved on the
@@ -42,6 +44,7 @@ object SessionStore {
     private const val KEY_NAME = "name"
     private const val KEY_EMAIL = "email"
     private const val KEY_MOBILE = "mobile"
+    private const val KEY_PHOTO = "photo"
 
     private lateinit var prefs: SharedPreferences
     private val _session = MutableStateFlow<Session?>(null)
@@ -67,7 +70,8 @@ object SessionStore {
                     role = role,
                     name = prefs.getString(KEY_NAME, "").orEmpty(),
                     email = prefs.getString(KEY_EMAIL, "").orEmpty(),
-                    mobile = prefs.getString(KEY_MOBILE, null)
+                    mobile = prefs.getString(KEY_MOBILE, null),
+                    photo = prefs.getString(KEY_PHOTO, null)
                 )
             )
         }
@@ -103,5 +107,6 @@ object SessionStore {
         putString(KEY_NAME, user.name)
         putString(KEY_EMAIL, user.email)
         putString(KEY_MOBILE, user.mobile)
+        putString(KEY_PHOTO, user.photo)
     }
 }

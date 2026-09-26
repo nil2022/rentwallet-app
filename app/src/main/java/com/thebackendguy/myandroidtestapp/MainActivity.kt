@@ -11,7 +11,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.DrawerValue
@@ -26,22 +29,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.thebackendguy.myandroidtestapp.data.AuthRepository
 import com.thebackendguy.myandroidtestapp.data.Demo
+import com.thebackendguy.myandroidtestapp.data.LandlordStore
 import com.thebackendguy.myandroidtestapp.data.UserRole
 import com.thebackendguy.myandroidtestapp.data.session.SessionStore
 import com.thebackendguy.myandroidtestapp.data.settled
 import com.thebackendguy.myandroidtestapp.ui.components.BrandLockup
 import com.thebackendguy.myandroidtestapp.ui.components.Notice
 import com.thebackendguy.myandroidtestapp.ui.components.StatusBarIcons
+import com.thebackendguy.myandroidtestapp.ui.components.ToastHost
 import com.thebackendguy.myandroidtestapp.ui.icons.LIcon
 import com.thebackendguy.myandroidtestapp.ui.icons.Lucide
 import com.thebackendguy.myandroidtestapp.ui.screens.LandlordTabs
@@ -51,9 +57,19 @@ import com.thebackendguy.myandroidtestapp.ui.screens.auth.ForgotPasswordScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.auth.LoginScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.auth.RegisterScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.auth.WelcomeScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.AddTenantScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.AssignRoomScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.ChangePasswordScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.EditProfileScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.landlord.LandlordOverviewScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.landlord.LandlordProfileScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.PropertiesScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.landlord.PropertyDetailsScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.PropertyFormScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.RoomDetailsScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.RoomFormScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.TenantDetailsScreen
+import com.thebackendguy.myandroidtestapp.ui.screens.landlord.TenantFormScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.landlord.TenantsScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.tenant.PayRentScreen
 import com.thebackendguy.myandroidtestapp.ui.screens.tenant.PaymentHistoryScreen
@@ -69,11 +85,24 @@ import kotlinx.coroutines.launch
 private enum class Screen {
     Welcome, Login, ForgotPassword, Register,
     TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
-    LandlordOverview, Tenants, PropertyDetails, LandlordProfile
+    LandlordOverview, Properties, PropertyDetails, PropertyForm, RoomDetails, RoomForm,
+    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, LandlordProfile, EditProfile, ChangePassword
 }
 
+/** One entry of the back stack: a screen and the ids it shows (see each screen in [RentFlowApp]). */
+private data class Route(val screen: Screen, val a: String? = null, val b: String? = null) {
+    fun encode() = listOf(screen.name, a.orEmpty(), b.orEmpty()).joinToString("|")
+
+    companion object {
+        fun decode(value: String) = value.split("|").let { Route(Screen.valueOf(it[0]), it[1].ifEmpty { null }, it[2].ifEmpty { null }) }
+    }
+}
+
+private val StackSaver = listSaver<List<Route>, String>(save = { stack -> stack.map { it.encode() } }, restore = { it.map(Route::decode) })
+
+private val AuthScreens = setOf(Screen.Welcome, Screen.Login, Screen.ForgotPassword, Screen.Register)
 private val TenantTabScreens = listOf(Screen.TenantHome, Screen.PaymentHistory, Screen.TenantProfile)
-private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Tenants, Screen.LandlordProfile)
+private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Tenants, Screen.LandlordProfile)
 
 private val TenantNotices = listOf(
     Notice("Rent due reminder", "May rent is due on 10 May."),
@@ -114,67 +143,67 @@ private fun RentFlowApp() {
     val endedByServer by SessionStore.endedByServer.collectAsState()
     // A saved session opens straight on its home screen
     val saved = remember { SessionStore.session.value }
-    var screen by rememberSaveable { mutableStateOf(saved?.let { homeFor(it.user.role) } ?: Screen.Welcome) }
+    var stack by rememberSaveable(stateSaver = StackSaver) {
+        mutableStateOf(listOf(Route(saved?.let { homeFor(it.user.role) } ?: Screen.Welcome)))
+    }
     var role by rememberSaveable { mutableStateOf(saved?.user?.role ?: UserRole.Tenant) }
-    var payIndex by rememberSaveable { mutableIntStateOf(0) }
-    var receiptIndex by rememberSaveable { mutableIntStateOf(0) }
-    var receiptBack by rememberSaveable { mutableStateOf(Screen.PaymentHistory) }
-    var tenantIndex by rememberSaveable { mutableIntStateOf(0) }
-    var propertyBack by rememberSaveable { mutableStateOf(Screen.Tenants) }
     // Payments the tenant has made in this session, by index into the demo list
     var paidIndexes by rememberSaveable { mutableStateOf(listOf<Int>()) }
 
+    val route = stack.last()
     val payments = Demo.tenantPayments.mapIndexed { i, p -> if (i in paidIndexes) p.settled() else p }
-    val tenants = Demo.tenants
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    fun go(screen: Screen, a: String? = null, b: String? = null) {
+        stack = stack + Route(screen, a, b)
+    }
+
+    fun replace(screen: Screen, a: String? = null, b: String? = null) {
+        stack = stack.dropLast(1) + Route(screen, a, b)
+    }
+
+    fun back() {
+        if (stack.size > 1) stack = stack.dropLast(1)
+    }
+
+    /** A tab sits on top of the role's home, so back from any tab goes home. */
+    fun openTab(screen: Screen) {
+        val home = homeFor(role)
+        stack = if (screen == home) listOf(Route(home)) else listOf(Route(home), Route(screen))
+    }
+
+    fun enterApp(signedInAs: UserRole) {
+        role = signedInAs
+        LandlordStore.clear()
+        stack = listOf(Route(homeFor(signedInAs)))
+    }
+
     fun signOut() {
         paidIndexes = emptyList()
-        screen = Screen.Welcome
+        LandlordStore.clear()
+        stack = listOf(Route(Screen.Welcome))
         scope.launch { AuthRepository.logout() }
     }
 
-    fun openReceipt(index: Int, from: Screen) {
-        receiptIndex = index
-        receiptBack = from
-        screen = Screen.Receipt
+    BackHandler(enabled = drawerState.isOpen || stack.size > 1) {
+        if (drawerState.isOpen) scope.launch { drawerState.close() } else back()
     }
 
-    fun openTenant(index: Int, from: Screen) {
-        tenantIndex = index
-        propertyBack = from
-        screen = Screen.PropertyDetails
-    }
+    StatusBarIcons(darkIcons = route.screen != Screen.Welcome)
 
-    val parent: Screen? = when (screen) {
-        Screen.Login -> Screen.Welcome
-        Screen.ForgotPassword, Screen.Register -> Screen.Login
-        Screen.PayRent, Screen.PaymentSuccess, Screen.PaymentHistory, Screen.TenantProfile -> Screen.TenantHome
-        Screen.Receipt -> receiptBack
-        Screen.Tenants, Screen.LandlordProfile -> Screen.LandlordOverview
-        Screen.PropertyDetails -> propertyBack
-        // Home screens and Welcome leave the app
-        else -> null
-    }
-    BackHandler(enabled = drawerState.isOpen || parent != null) {
-        if (drawerState.isOpen) scope.launch { drawerState.close() } else parent?.let { screen = it }
-    }
-
-    StatusBarIcons(darkIcons = screen != Screen.Welcome)
-
-    val signedIn = screen in TenantTabScreens || screen in LandlordTabScreens ||
-        screen in listOf(Screen.PayRent, Screen.PaymentSuccess, Screen.Receipt, Screen.PropertyDetails)
+    val isSignedInScreen = route.screen !in AuthScreens
 
     // Check the saved token and refresh the name and contact details
     LaunchedEffect(Unit) { AuthRepository.refreshProfile() }
 
     // The session ended (token rejected, or the app restarted without "Remember me")
-    LaunchedEffect(session == null, signedIn) {
-        if (session == null && signedIn) {
+    LaunchedEffect(session == null, isSignedInScreen) {
+        if (session == null && isSignedInScreen) {
             drawerState.close()
             paidIndexes = emptyList()
-            screen = Screen.Login
+            LandlordStore.clear()
+            stack = listOf(Route(Screen.Welcome), Route(Screen.Login))
         }
     }
 
@@ -185,173 +214,258 @@ private fun RentFlowApp() {
         initials = user?.initials ?: "",
         notices = if (role == UserRole.Tenant) TenantNotices else LandlordNotices,
         onMenu = { scope.launch { drawerState.open() } },
-        onProfile = { screen = tabScreens.last() },
-        onTab = { screen = tabScreens[it] }
+        onProfile = { openTab(tabScreens.last()) },
+        onTab = { openTab(tabScreens[it]) }
     )
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = signedIn && drawerState.isOpen,
-        drawerContent = {
-            ModalDrawerSheet(drawerContainerColor = Rf.Lowest) {
-                Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 16.dp)) {
-                    BrandLockup(color = Rf.OnSurface, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
-                    Text(
-                        text = "${user?.name.orEmpty()} • ${role.name}",
-                        style = RfType.LabelSm,
-                        color = Rf.OnSurfaceVariant,
-                        modifier = Modifier.padding(start = 12.dp, bottom = 16.dp)
-                    )
-                    val tabs = if (role == UserRole.Tenant) TenantTabs else LandlordTabs
-                    tabs.forEachIndexed { index, tab ->
-                        NavigationDrawerItem(
-                            label = { Text(tab.label, style = RfType.LabelMd) },
-                            icon = { LIcon(tab.icon) },
-                            selected = screen == tabScreens[index],
-                            onClick = {
-                                screen = tabScreens[index]
-                                scope.launch { drawerState.close() }
-                            },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                selectedContainerColor = Rf.PrimaryFixed,
-                                selectedTextColor = Rf.Primary,
-                                selectedIconColor = Rf.Primary,
-                                unselectedTextColor = Rf.OnSurface,
-                                unselectedIconColor = Rf.OnSurfaceVariant
+    Box(Modifier.fillMaxSize()) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = isSignedInScreen && drawerState.isOpen,
+            drawerContent = {
+                ModalDrawerSheet(drawerContainerColor = Rf.Lowest) {
+                    Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 16.dp)) {
+                        BrandLockup(color = Rf.OnSurface, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
+                        Text(
+                            text = "${user?.name.orEmpty()} • ${role.name}",
+                            style = RfType.LabelSm,
+                            color = Rf.OnSurfaceVariant,
+                            modifier = Modifier.padding(start = 12.dp, bottom = 16.dp)
+                        )
+                        val tabs = if (role == UserRole.Tenant) TenantTabs else LandlordTabs
+                        tabs.forEachIndexed { index, tab ->
+                            NavigationDrawerItem(
+                                label = { Text(tab.label, style = RfType.LabelMd) },
+                                icon = { LIcon(tab.icon) },
+                                selected = route.screen == tabScreens[index],
+                                onClick = {
+                                    openTab(tabScreens[index])
+                                    scope.launch { drawerState.close() }
+                                },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    selectedContainerColor = Rf.PrimaryFixed,
+                                    selectedTextColor = Rf.Primary,
+                                    selectedIconColor = Rf.Primary,
+                                    unselectedTextColor = Rf.OnSurface,
+                                    unselectedIconColor = Rf.OnSurfaceVariant
+                                )
                             )
+                        }
+                        HorizontalDivider(color = Rf.Low, modifier = Modifier.padding(vertical = 12.dp))
+                        NavigationDrawerItem(
+                            label = { Text("Log out", style = RfType.LabelMd) },
+                            icon = { LIcon(Lucide.LogOut) },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                signOut()
+                            },
+                            colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = Rf.Error, unselectedIconColor = Rf.Error)
                         )
                     }
-                    HorizontalDivider(color = Rf.Low, modifier = Modifier.padding(vertical = 12.dp))
-                    NavigationDrawerItem(
-                        label = { Text("Log out", style = RfType.LabelMd) },
-                        icon = { LIcon(Lucide.LogOut) },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            signOut()
+                }
+            }
+        ) {
+            AnimatedContent(
+                targetState = route,
+                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                label = "screen"
+            ) { current ->
+                val a = current.a
+                val b = current.b
+                when (current.screen) {
+                    /* ---------- Sign in ---------- */
+                    Screen.Welcome -> WelcomeScreen(
+                        onChooseRole = {
+                            role = it
+                            go(Screen.Login)
                         },
-                        colors = NavigationDrawerItemDefaults.colors(unselectedTextColor = Rf.Error, unselectedIconColor = Rf.Error)
+                        onSignIn = { go(Screen.Login) }
                     )
+
+                    Screen.Login -> LoginScreen(
+                        initialRole = role,
+                        notice = if (endedByServer) "Your session has ended. Please sign in again." else null,
+                        onBack = ::back,
+                        onSignedIn = ::enterApp,
+                        onForgotPassword = {
+                            role = it
+                            go(Screen.ForgotPassword)
+                        },
+                        onRegister = {
+                            role = UserRole.Landlord
+                            go(Screen.Register)
+                        }
+                    )
+
+                    Screen.ForgotPassword -> ForgotPasswordScreen(role = role, onBack = ::back, onBackToLogin = ::back)
+
+                    Screen.Register -> RegisterScreen(
+                        onBack = ::back,
+                        onLogin = ::back,
+                        onRegistered = { enterApp(UserRole.Landlord) }
+                    )
+
+                    /* ---------- Tenant (rent and payments are sample data) ---------- */
+                    Screen.TenantHome -> TenantHomeScreen(
+                        firstName = user?.firstName.orEmpty(),
+                        payments = payments,
+                        shell = shell,
+                        onPayRent = { go(Screen.PayRent, "0") },
+                        onOpenReceipt = { go(Screen.Receipt, "$it") },
+                        onOpenHistory = { openTab(Screen.PaymentHistory) },
+                        onOpenProfile = { openTab(Screen.TenantProfile) }
+                    )
+
+                    Screen.PayRent -> {
+                        val index = a?.toIntOrNull() ?: 0
+                        PayRentScreen(
+                            payment = payments[index],
+                            shell = shell,
+                            onBack = ::back,
+                            onConfirm = {
+                                paidIndexes = (paidIndexes + index).distinct()
+                                replace(Screen.PaymentSuccess, "$index")
+                            }
+                        )
+                    }
+
+                    Screen.PaymentSuccess -> {
+                        val index = a?.toIntOrNull() ?: 0
+                        PaymentSuccessScreen(
+                            payment = payments[index],
+                            onBackToDashboard = { openTab(Screen.TenantHome) },
+                            onViewReceipt = { replace(Screen.Receipt, "$index") }
+                        )
+                    }
+
+                    Screen.PaymentHistory -> PaymentHistoryScreen(
+                        payments = payments,
+                        shell = shell,
+                        onOpenReceipt = { go(Screen.Receipt, "$it") },
+                        onPay = { go(Screen.PayRent, "$it") }
+                    )
+
+                    Screen.Receipt -> ReceiptScreen(payment = payments[a?.toIntOrNull() ?: 0], shell = shell, onBack = ::back)
+
+                    Screen.TenantProfile -> TenantProfileScreen(user = user, shell = shell, onLogout = ::signOut)
+
+                    /* ---------- Landlord ---------- */
+                    Screen.LandlordOverview -> LandlordOverviewScreen(
+                        firstName = user?.firstName.orEmpty(),
+                        tenants = Demo.tenants,
+                        shell = shell,
+                        onOpenTenants = { openTab(Screen.Tenants) },
+                        onAddProperty = { go(Screen.PropertyForm) },
+                        onAddTenant = { go(Screen.AddTenant) }
+                    )
+
+                    Screen.Properties -> PropertiesScreen(
+                        shell = shell,
+                        onOpenProperty = { go(Screen.PropertyDetails, it) },
+                        onAddProperty = { go(Screen.PropertyForm) }
+                    )
+
+                    // a = property id
+                    Screen.PropertyDetails -> PropertyDetailsScreen(
+                        propertyId = a.orEmpty(),
+                        shell = shell,
+                        onBack = ::back,
+                        onEdit = { go(Screen.PropertyForm, a) },
+                        onAddRoom = { go(Screen.RoomForm, a) },
+                        onOpenRoom = { go(Screen.RoomDetails, it) },
+                        onDeleted = ::back
+                    )
+
+                    // a = property id when editing
+                    Screen.PropertyForm -> PropertyFormScreen(
+                        propertyId = a,
+                        shell = shell,
+                        onBack = ::back,
+                        onSaved = { id -> if (a == null) replace(Screen.PropertyDetails, id) else back() }
+                    )
+
+                    // a = room id
+                    Screen.RoomDetails -> RoomDetailsScreen(
+                        roomId = a.orEmpty(),
+                        shell = shell,
+                        onBack = ::back,
+                        onEdit = { go(Screen.RoomForm, null, a) },
+                        onOpenTenant = { go(Screen.TenantDetails, it) },
+                        onAssign = { go(Screen.AssignRoom, a) },
+                        onDeleted = ::back
+                    )
+
+                    // a = property id for a new room, b = room id when editing
+                    Screen.RoomForm -> RoomFormScreen(
+                        propertyId = a,
+                        roomId = b,
+                        shell = shell,
+                        onBack = ::back,
+                        onSaved = { id -> if (b == null) replace(Screen.RoomDetails, id) else back() }
+                    )
+
+                    Screen.Tenants -> TenantsScreen(
+                        shell = shell,
+                        onOpenTenant = { go(Screen.TenantDetails, it) },
+                        onAddTenant = { go(Screen.AddTenant) },
+                        onAssignRoom = { go(Screen.AddTenant, it) }
+                    )
+
+                    // a = tenant id
+                    Screen.TenantDetails -> TenantDetailsScreen(
+                        tenantId = a.orEmpty(),
+                        shell = shell,
+                        onBack = ::back,
+                        onEdit = { go(Screen.TenantForm, a) },
+                        onAssignRoom = { go(Screen.AddTenant, a) },
+                        onOpenRoom = { go(Screen.RoomDetails, it) },
+                        onDeleted = ::back
+                    )
+
+                    // a = tenant id
+                    Screen.TenantForm -> TenantFormScreen(tenantId = a.orEmpty(), shell = shell, onBack = ::back, onSaved = ::back)
+
+                    // a = an existing tenant to give a room to, b = a room already chosen
+                    Screen.AddTenant -> AddTenantScreen(
+                        existingTenantId = a,
+                        presetRoomId = b,
+                        shell = shell,
+                        onBack = ::back,
+                        onDone = { id ->
+                            if (a != null) {
+                                back()
+                            } else {
+                                // Coming from "Assign room" on a room, that screen is done too
+                                stack = stack.dropLast(1).dropLastWhile { it.screen == Screen.AssignRoom } + Route(Screen.TenantDetails, id)
+                            }
+                        }
+                    )
+
+                    // a = room id
+                    Screen.AssignRoom -> AssignRoomScreen(
+                        roomId = a.orEmpty(),
+                        shell = shell,
+                        onBack = ::back,
+                        onNewTenant = { go(Screen.AddTenant, null, a) },
+                        onDone = ::back
+                    )
+
+                    Screen.LandlordProfile -> LandlordProfileScreen(
+                        user = user,
+                        shell = shell,
+                        onEditProfile = { go(Screen.EditProfile) },
+                        onChangePassword = { go(Screen.ChangePassword) },
+                        onLogout = ::signOut
+                    )
+
+                    Screen.EditProfile -> EditProfileScreen(user = user, shell = shell, onBack = ::back)
+
+                    Screen.ChangePassword -> ChangePasswordScreen(shell = shell, onBack = ::back)
                 }
             }
         }
-    ) {
-        AnimatedContent(
-            targetState = screen,
-            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
-            label = "screen"
-        ) { current ->
-            when (current) {
-                Screen.Welcome -> WelcomeScreen(
-                    onChooseRole = {
-                        role = it
-                        screen = Screen.Login
-                    },
-                    onSignIn = { screen = Screen.Login }
-                )
-
-                Screen.Login -> LoginScreen(
-                    initialRole = role,
-                    notice = if (endedByServer) "Your session has ended. Please sign in again." else null,
-                    onBack = { screen = Screen.Welcome },
-                    onSignedIn = {
-                        role = it
-                        screen = if (it == UserRole.Tenant) Screen.TenantHome else Screen.LandlordOverview
-                    },
-                    onForgotPassword = {
-                        role = it
-                        screen = Screen.ForgotPassword
-                    },
-                    onRegister = {
-                        role = UserRole.Landlord
-                        screen = Screen.Register
-                    }
-                )
-
-                Screen.ForgotPassword -> ForgotPasswordScreen(
-                    role = role,
-                    onBack = { screen = Screen.Login },
-                    onBackToLogin = { screen = Screen.Login }
-                )
-
-                Screen.Register -> RegisterScreen(
-                    onBack = { screen = Screen.Login },
-                    onLogin = { screen = Screen.Login },
-                    onRegistered = {
-                        role = UserRole.Landlord
-                        screen = Screen.LandlordOverview
-                    }
-                )
-
-                Screen.TenantHome -> TenantHomeScreen(
-                    firstName = user?.firstName.orEmpty(),
-                    payments = payments,
-                    shell = shell,
-                    onPayRent = {
-                        payIndex = 0
-                        screen = Screen.PayRent
-                    },
-                    onOpenReceipt = { openReceipt(it, Screen.TenantHome) },
-                    onOpenHistory = { screen = Screen.PaymentHistory },
-                    onOpenProfile = { screen = Screen.TenantProfile }
-                )
-
-                Screen.PayRent -> PayRentScreen(
-                    payment = payments[payIndex],
-                    shell = shell,
-                    onBack = { screen = Screen.TenantHome },
-                    onConfirm = {
-                        paidIndexes = (paidIndexes + payIndex).distinct()
-                        screen = Screen.PaymentSuccess
-                    }
-                )
-
-                Screen.PaymentSuccess -> PaymentSuccessScreen(
-                    payment = payments[payIndex],
-                    onBackToDashboard = { screen = Screen.TenantHome },
-                    onViewReceipt = { openReceipt(payIndex, Screen.TenantHome) }
-                )
-
-                Screen.PaymentHistory -> PaymentHistoryScreen(
-                    payments = payments,
-                    shell = shell,
-                    onOpenReceipt = { openReceipt(it, Screen.PaymentHistory) },
-                    onPay = {
-                        payIndex = it
-                        screen = Screen.PayRent
-                    }
-                )
-
-                Screen.Receipt -> ReceiptScreen(
-                    payment = payments[receiptIndex],
-                    shell = shell,
-                    onBack = { screen = receiptBack }
-                )
-
-                Screen.TenantProfile -> TenantProfileScreen(user = user, shell = shell, onLogout = ::signOut)
-
-                Screen.LandlordOverview -> LandlordOverviewScreen(
-                    firstName = user?.firstName.orEmpty(),
-                    tenants = tenants,
-                    shell = shell,
-                    onOpenTenants = { screen = Screen.Tenants },
-                    onOpenTenant = { openTenant(it, Screen.LandlordOverview) }
-                )
-
-                Screen.Tenants -> TenantsScreen(
-                    tenants = tenants,
-                    shell = shell,
-                    onOpenTenant = { openTenant(it, Screen.Tenants) }
-                )
-
-                Screen.PropertyDetails -> PropertyDetailsScreen(
-                    tenant = tenants[tenantIndex],
-                    shell = shell,
-                    onBack = { screen = propertyBack }
-                )
-
-                Screen.LandlordProfile -> LandlordProfileScreen(user = user, tenants = tenants, shell = shell, onLogout = ::signOut)
-            }
-        }
+        // Save and delete messages float above the bottom tabs and form buttons
+        ToastHost(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp))
     }
 }

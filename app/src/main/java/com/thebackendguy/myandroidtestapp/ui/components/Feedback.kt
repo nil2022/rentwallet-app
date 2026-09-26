@@ -19,6 +19,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -34,6 +35,8 @@ import com.thebackendguy.myandroidtestapp.ui.icons.Lucide
 import com.thebackendguy.myandroidtestapp.ui.theme.Rf
 import com.thebackendguy.myandroidtestapp.ui.theme.RfType
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** Round loading spinner for buttons and chips while a request runs. */
 @Composable
@@ -42,17 +45,27 @@ fun Spinner(color: Color, size: Dp = 18.dp, strokeWidth: Dp = 2.dp) {
 }
 
 /**
- * Error that floats up slowly from the bottom of the screen, stays a few
- * seconds, then slides back down. Tap it to close it sooner.
+ * A note that floats up slowly from the bottom of the screen, stays a few
+ * seconds, then slides back down. Tap it to close it sooner. A new [key]
+ * shows it again even when the text is the same.
  */
 @Composable
-fun FloatingError(message: String?, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun FloatingNotice(
+    message: String?,
+    isError: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    key: Any? = message
+) {
     val dismiss by rememberUpdatedState(onDismiss)
-    // Keeps the text on screen while the note slides away after message turns null
-    val last = remember { arrayOf("") }
-    if (message != null) last[0] = message
+    // Keeps the text and colour on screen while the note slides away after message turns null
+    val last = remember { Shown() }
+    if (message != null) {
+        last.text = message
+        last.error = isError
+    }
 
-    LaunchedEffect(message) {
+    LaunchedEffect(key, message != null) {
         if (message != null) {
             delay(4_500)
             dismiss()
@@ -65,26 +78,68 @@ fun FloatingError(message: String?, onDismiss: () -> Unit, modifier: Modifier = 
         enter = slideInVertically(tween(650, easing = EaseOutCubic)) { it } + fadeIn(tween(650)),
         exit = slideOutVertically(tween(350, easing = EaseInCubic)) { it } + fadeOut(tween(350))
     ) {
+        val error = last.error
         val shape = RoundedCornerShape(14.dp)
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .pressable({ dismiss() }, pressScale = 0.98f)
-                .softShadow(shape, elevation = 12.dp, color = Rf.Error.copy(alpha = 0.35f))
+                .softShadow(shape, elevation = 12.dp, color = if (error) Rf.Error.copy(alpha = 0.35f) else Rf.Shadow)
                 .clip(shape)
-                .background(Rf.ErrorContainer)
+                .background(if (error) Rf.ErrorContainer else Rf.InverseSurface)
                 .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            LIcon(Lucide.TriangleAlert, size = 20.dp, tint = Rf.Error)
+            if (error) LIcon(Lucide.TriangleAlert, size = 20.dp, tint = Rf.Error)
+            else LIcon(Lucide.CircleCheck, size = 20.dp, tint = Rf.Mint)
             Text(
-                text = last[0],
+                text = last.text,
                 style = RfType.BodySm.copy(fontWeight = FontWeight.SemiBold),
-                color = Rf.OnErrorContainer,
+                color = if (error) Rf.OnErrorContainer else Color.White,
                 modifier = Modifier.weight(1f)
             )
         }
     }
+}
+
+private class Shown(var text: String = "", var error: Boolean = true)
+
+/** The red version, for the sign-in screens. */
+@Composable
+fun FloatingError(message: String?, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    FloatingNotice(message, isError = true, onDismiss = onDismiss, modifier = modifier)
+}
+
+/** App-wide short messages, such as "Property saved", shown by [ToastHost]. */
+object Toasts {
+    data class Toast(val text: String, val isError: Boolean, val id: Long = System.nanoTime())
+
+    private val _current = MutableStateFlow<Toast?>(null)
+    val current: StateFlow<Toast?> = _current
+
+    fun show(text: String) {
+        _current.value = Toast(text, isError = false)
+    }
+
+    fun error(text: String) {
+        _current.value = Toast(text, isError = true)
+    }
+
+    fun dismiss(id: Long) {
+        if (_current.value?.id == id) _current.value = null
+    }
+}
+
+@Composable
+fun ToastHost(modifier: Modifier = Modifier) {
+    val toast by Toasts.current.collectAsState()
+    FloatingNotice(
+        message = toast?.text,
+        isError = toast?.isError ?: false,
+        onDismiss = { toast?.let { Toasts.dismiss(it.id) } },
+        modifier = modifier,
+        key = toast?.id
+    )
 }
