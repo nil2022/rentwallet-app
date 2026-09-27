@@ -17,7 +17,7 @@ class RentFlowMessagingService : FirebaseMessagingService() {
         Notifications.show(this, title, body)
     }
 
-    // A new install or a reset token. The backend will store it once it has an endpoint for it.
+    // A new install or a reset token. It reaches the server the next time a home screen opens.
     @Suppress("OVERRIDE_DEPRECATION")
     override fun onNewToken(token: String) {
         Log.d(Notifications.TAG, "New FCM token: $token")

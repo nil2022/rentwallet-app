@@ -15,6 +15,8 @@ import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.thebackendguy.rentflow.MainActivity
 import com.thebackendguy.rentflow.R
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /** Push notifications from Firebase Cloud Messaging. */
 object Notifications {
@@ -38,14 +40,23 @@ object Notifications {
     /**
      * Prints this phone's FCM token to Logcat, for "Send test message" in the Firebase console.
      * Firebase deprecated tokens for installation ids (register/onRegistered) in 25.1.0, but tokens
-     * still work and the console test takes one; switch when the backend starts storing ids.
+     * still work, the console test takes one, and the backend stores tokens (PUT /fcm-token).
      */
-    @Suppress("DEPRECATION")
     fun logToken() {
-        FirebaseMessaging.getInstance().token
+        tokenTask()
             .addOnSuccessListener { Log.d(TAG, "FCM token: $it") }
             .addOnFailureListener { Log.w(TAG, "Could not get the FCM token", it) }
     }
+
+    /** This phone's FCM token, or null without Google Play services or a network. */
+    suspend fun token(): String? = suspendCancellableCoroutine { continuation ->
+        tokenTask()
+            .addOnSuccessListener { continuation.resume(it) }
+            .addOnFailureListener { continuation.resume(null) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun tokenTask() = FirebaseMessaging.getInstance().token
 
     /** Shows a notification that opens the app when tapped. */
     fun show(context: Context, title: String?, body: String?) {

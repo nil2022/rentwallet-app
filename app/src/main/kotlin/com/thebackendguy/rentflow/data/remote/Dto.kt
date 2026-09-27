@@ -31,6 +31,10 @@ data class LoginBody(val email: String, val password: String)
 @Serializable
 data class EmailBody(val email: String)
 
+/** Leaving [fcmToken] out (null) sends `{}`, which logout accepts. */
+@Serializable
+data class FcmTokenBody(val fcmToken: String? = null)
+
 @Serializable
 data class OtpBody(val email: String, val otp: String)
 

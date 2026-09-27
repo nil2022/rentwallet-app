@@ -223,6 +223,11 @@ private fun RentFlowApp() {
         }
     }
 
+    // Keep this phone's push token on the server: every time a home screen (Overview or tenant Home) opens
+    LaunchedEffect(route) {
+        if (route.screen == Screen.LandlordOverview || route.screen == Screen.TenantHome) AuthRepository.savePushToken()
+    }
+
     // The session ended (token rejected, or the app restarted without "Remember me")
     LaunchedEffect(session == null, isSignedInScreen) {
         if (session == null && isSignedInScreen) {

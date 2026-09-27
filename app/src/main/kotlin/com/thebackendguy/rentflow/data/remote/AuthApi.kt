@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -38,9 +39,17 @@ interface AuthApi {
     @POST("{role}/auth/verify-reset-password")
     suspend fun resetPassword(@Path("role") role: String, @Body body: ResetPasswordBody): ApiEnvelope<JsonElement>
 
-    /** Takes the token itself, because the session is cleared before this call goes out. */
+    /** Takes the token itself, because the session is cleared before this call goes out. The FCM token in the body stops pushes to this phone. */
     @POST("{role}/auth/logout")
-    suspend fun logout(@Path("role") role: String, @Header("Authorization") authorization: String): ApiEnvelope<JsonElement>
+    suspend fun logout(
+        @Path("role") role: String,
+        @Header("Authorization") authorization: String,
+        @Body body: FcmTokenBody
+    ): ApiEnvelope<JsonElement>
+
+    /** Adds this phone's FCM token to the signed-in account (landlord or tenant); sending it again changes nothing. */
+    @PUT("fcm-token")
+    suspend fun saveFcmToken(@Body body: FcmTokenBody): ApiEnvelope<JsonElement>
 
     /** Creates an unverified landlord account; the email is verified with a code next. */
     @POST("landlord")

@@ -2,7 +2,9 @@ package com.thebackendguy.rentflow.data
 
 import com.thebackendguy.rentflow.data.remote.ApiEnvelope
 import com.thebackendguy.rentflow.data.remote.ApiResult
+import android.util.Log
 import com.thebackendguy.rentflow.data.remote.EmailBody
+import com.thebackendguy.rentflow.data.remote.FcmTokenBody
 import com.thebackendguy.rentflow.data.remote.LoginBody
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.remote.OtpBody
@@ -13,6 +15,7 @@ import com.thebackendguy.rentflow.data.remote.apiCall
 import com.thebackendguy.rentflow.data.remote.discard
 import com.thebackendguy.rentflow.data.session.SessionStore
 import com.thebackendguy.rentflow.data.session.toSessionUser
+import com.thebackendguy.rentflow.push.Notifications
 import kotlinx.coroutines.withTimeoutOrNull
 
 val UserRole.apiPath: String get() = name.lowercase()
@@ -54,11 +57,24 @@ object AuthRepository {
         if (result is ApiResult.Ok) result.value.data?.let { SessionStore.updateUser(it.toSessionUser(user.role)) }
     }
 
-    /** Forgets the session straight away, then tells the server. */
+    /** Sends this phone's FCM token to the server, so pushes for the signed-in account reach it. */
+    suspend fun savePushToken() {
+        if (SessionStore.session.value == null) return
+        val token = Notifications.token() ?: return
+        when (val result = apiCall { api.saveFcmToken(FcmTokenBody(token)) }) {
+            is ApiResult.Ok -> Log.d(Notifications.TAG, "FCM token saved on the server")
+            is ApiResult.Fail -> Log.w(Notifications.TAG, "Could not save the FCM token: ${result.message}")
+        }
+    }
+
+    /** Forgets the session straight away, then tells the server, which stops pushes to this phone. */
     suspend fun logout() {
         val session = SessionStore.session.value ?: return
         SessionStore.clear()
-        withTimeoutOrNull(5_000) { apiCall { api.logout(session.user.role.apiPath, "Bearer ${session.token}") } }
+        withTimeoutOrNull(5_000) {
+            val body = FcmTokenBody(Notifications.token())
+            apiCall { api.logout(session.user.role.apiPath, "Bearer ${session.token}", body) }
+        }
     }
 
     private suspend fun signIn(role: UserRole, remember: Boolean, call: suspend () -> ApiEnvelope<UserDto>): ApiResult<Unit> =
