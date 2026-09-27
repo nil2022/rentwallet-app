@@ -43,13 +43,13 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.thebackendguy.rentflow.data.AuthRepository
 import com.thebackendguy.rentflow.data.Demo
 import com.thebackendguy.rentflow.data.LandlordStore
+import com.thebackendguy.rentflow.data.NotificationStore
 import com.thebackendguy.rentflow.data.UserRole
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.session.SessionStore
 import com.thebackendguy.rentflow.data.settled
 import com.thebackendguy.rentflow.push.Notifications
 import com.thebackendguy.rentflow.ui.components.AppDrawer
-import com.thebackendguy.rentflow.ui.components.Notice
 import com.thebackendguy.rentflow.ui.components.SystemBars
 import com.thebackendguy.rentflow.ui.components.ToastHost
 import com.thebackendguy.rentflow.ui.screens.LandlordTabs
@@ -106,15 +106,6 @@ private val AuthScreens = setOf(Screen.Login, Screen.ForgotPassword, Screen.Regi
 private val TenantTabScreens = listOf(Screen.TenantHome, Screen.PaymentHistory, Screen.TenantProfile)
 private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Tenants, Screen.LandlordProfile)
 
-private val TenantNotices = listOf(
-    Notice("Rent due reminder", "May rent is due on 10 May."),
-    Notice("Receipt generated", "Your April rent receipt is ready.")
-)
-private val LandlordNotices = listOf(
-    Notice("Rent received", "Rohan’s May rent was credited to your wallet."),
-    Notice("Pending rent", "Arjun and Neha still have May rent pending.")
-)
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -144,6 +135,12 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // Back in the app: pushes may have come while it was away
+    override fun onResume() {
+        super.onResume()
+        NotificationStore.refreshCount()
+    }
 }
 
 private fun homeFor(role: UserRole) = if (role == UserRole.Tenant) Screen.TenantHome else Screen.LandlordOverview
@@ -152,6 +149,7 @@ private fun homeFor(role: UserRole) = if (role == UserRole.Tenant) Screen.Tenant
 private fun RentFlowApp() {
     val session by SessionStore.session.collectAsState()
     val endedByServer by SessionStore.endedByServer.collectAsState()
+    val unread by NotificationStore.unread.collectAsState()
     // A saved session opens straight on its home screen; otherwise the app opens on Login
     val saved = remember { SessionStore.session.value }
     var stack by rememberSaveable(stateSaver = StackSaver) {
@@ -188,12 +186,14 @@ private fun RentFlowApp() {
     fun enterApp(signedInAs: UserRole) {
         role = signedInAs
         LandlordStore.clear()
+        NotificationStore.clear()
         stack = listOf(Route(homeFor(signedInAs)))
     }
 
     fun signOut() {
         paidIndexes = emptyList()
         LandlordStore.clear()
+        NotificationStore.clear()
         stack = listOf(Route(Screen.Login))
         scope.launch { AuthRepository.logout() }
     }
@@ -223,9 +223,13 @@ private fun RentFlowApp() {
         }
     }
 
-    // Keep this phone's push token on the server: every time a home screen (Overview or tenant Home) opens
+    // Every time a home screen (Overview or tenant Home) opens: keep this phone's push token
+    // on the server and refresh the bell's count
     LaunchedEffect(route) {
-        if (route.screen == Screen.LandlordOverview || route.screen == Screen.TenantHome) AuthRepository.savePushToken()
+        if (route.screen == Screen.LandlordOverview || route.screen == Screen.TenantHome) {
+            NotificationStore.refreshCount()
+            AuthRepository.savePushToken()
+        }
     }
 
     // The session ended (token rejected, or the app restarted without "Remember me")
@@ -234,6 +238,7 @@ private fun RentFlowApp() {
             drawerState.close()
             paidIndexes = emptyList()
             LandlordStore.clear()
+            NotificationStore.clear()
             stack = listOf(Route(Screen.Login))
         }
     }
@@ -244,7 +249,7 @@ private fun RentFlowApp() {
         role = role,
         name = user?.name.orEmpty(),
         photo = user?.photo,
-        notices = if (role == UserRole.Tenant) TenantNotices else LandlordNotices,
+        unread = unread,
         onMenu = { scope.launch { drawerState.open() } },
         onProfile = { openTab(tabScreens.last()) },
         onTab = { openTab(tabScreens[it]) }

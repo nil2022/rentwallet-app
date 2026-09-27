@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.thebackendguy.rentflow.data.UserRole
 import com.thebackendguy.rentflow.ui.components.NavTab
-import com.thebackendguy.rentflow.ui.components.Notice
 import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.RfBottomNav
 import com.thebackendguy.rentflow.ui.components.RfCard
@@ -34,13 +37,14 @@ class Shell(
     private val role: UserRole,
     private val name: String,
     private val photo: String?,
-    private val notices: List<Notice>,
+    private val unread: Int,
     private val onMenu: () -> Unit,
     private val onProfile: () -> Unit,
     private val onTab: (Int) -> Unit
 ) {
     @Composable
     fun TopBar(title: String, onBack: (() -> Unit)? = null, chip: String? = null) {
+        var showNotifications by remember { mutableStateOf(false) }
         RfTopBar(
             title = title,
             name = name,
@@ -48,9 +52,11 @@ class Shell(
             onMenu = onMenu,
             onBack = onBack,
             chip = chip,
-            notices = notices,
+            unread = unread,
+            onNotifications = { showNotifications = true },
             onProfile = onProfile
         )
+        if (showNotifications) NotificationsSheet(role, onDismiss = { showNotifications = false })
     }
 
     @Composable

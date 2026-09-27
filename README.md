@@ -151,7 +151,7 @@ flowchart TD
 How navigation works:
 
 - **Bottom tabs.** Tenants have Home, Payments and Profile. Landlords have Overview, Properties, Tenants and Profile.
-- **Top bar.** The menu button opens the side drawer. The bell lists alerts, the moon/sun button switches the theme, and your photo opens Profile. Inner screens show a back arrow and the screen title.
+- **Top bar.** The menu button opens the side drawer. The bell shows how many notifications are unread and opens them in a bottom sheet, the moon/sun button switches the theme, and your photo opens Profile. Inner screens show a back arrow and the screen title.
 - **Side drawer.** As on the web: 260 dp wide (at most 85% of the screen) and navy in both themes, with the logo, the same tabs as the bottom bar, and a card with your photo, name and role that opens Profile. Log out is the icon on that card.
 - **Back button.** Screens form a stack, so Back returns to the screen you came from. A tab goes back to the home screen; on a home screen or Login, Back leaves the app.
 - **Staying signed in.** With “Remember for 30 days”, the app opens signed in next time. Without it, the session ends when the app closes. If the server rejects the saved session, the app returns to login and says why.
@@ -167,8 +167,9 @@ How navigation works:
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |
 | Tenant Home, Pay Rent, Payments, Receipt | None yet | Everything |
+| Bell and notifications (both roles) | Unread count, the list 20 at a time | None |
 
-Every call is one the web app already makes. The landlord endpoints are under `/api/v1/landlord` (property, room, tenant, lease, profile), photos go through `/api/v1/upload/presigned`, and sign-in uses `/api/v1/{landlord|tenant}/auth`.
+Every call is one the web app already makes. The landlord endpoints are under `/api/v1/landlord` (property, room, tenant, lease, profile), photos go through `/api/v1/upload/presigned`, and sign-in uses `/api/v1/{landlord|tenant}/auth`. Notifications use `/api/v1/notification` and `/api/v1/notification/count`, and the phone's FCM token goes to `PUT /api/v1/fcm-token`.
 
 ## Design system
 
@@ -233,6 +234,7 @@ app/src/main/
 │   ├── data/
 │   │   ├── AuthRepository.kt     # Sign-in, OTP, password reset, registration, log out
 │   │   ├── LandlordStore.kt      # Properties, rooms and tenants; every add, edit and delete
+│   │   ├── NotificationStore.kt  # The bell's unread count and the notification list
 │   │   ├── Labels.kt             # Floors, dates, amounts and types as the web shows them
 │   │   ├── DemoData.kt           # Sample rent, payments and wallet; ₹ formatting
 │   │   ├── session/              # SessionStore: the signed-in account and token
@@ -244,6 +246,7 @@ app/src/main/
 │       ├── components/           # Cards, buttons, fields, forms, states, side drawer, photos: loaders, picker, crop, preview
 │       └── screens/
 │           ├── Shell.kt          # Top bar and tabs per role, profile header, log out button (drawer in components/Drawer.kt)
+│           ├── NotificationsSheet.kt # The bell's bottom sheet: Today / Yesterday / Earlier, Load more
 │           ├── auth/             # Login, Forgot Password, Register
 │           ├── tenant/           # Home, Pay Rent, Payment Success, History, Receipt, Profile
 │           └── landlord/         # Overview, Properties, Rooms, Tenants, leases, Profile
@@ -291,16 +294,25 @@ On Wi-Fi, use your PC’s IP instead of `localhost`, and add that IP to [`networ
 
 After login the app asks for notification permission (Android 13+). Filter Logcat by `RentFlowPush` and copy the `FCM token`. In the Firebase console open Messaging, create a notification, and use **Send test message** with that token. The notification shows with the app in the background and in the foreground, and opens the app when tapped.
 
+Every time Overview or the tenant Home opens, the app sends its FCM token to the server (`PUT /fcm-token`); logging out removes it. The bell's count refreshes then, when the app comes back to the front, and when a push arrives while the app is open. Opening the bell loads the list, and the server marks every notification read at that moment, so the badge clears. Unread ones stay highlighted until the sheet is opened again.
+
+### Notifications sheet
+
+- Loading rows while the first page loads, then the list grouped into Today, Yesterday and Earlier, newest first.
+- Each notification has an icon for its type (rent reminder, payment, property, booking, message, system), the time (“12 min ago” today, “6:40 PM” yesterday, “25 Sep” before that) and, if it was unread, a tint and a dot.
+- 20 at a time with a Load more button, “You’re all caught up” when there are none, and Try again when it can’t load.
+- Tapping a notification does nothing yet: the push data doesn’t say which tenant, room or payment it is about.
+
 ## What’s next
 
 The app uses the same backend as the web app (`rent-management`, Express and MongoDB, base path `/api/v1`).
 
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
 2. ~~**Landlord data:** properties, rooms, tenants and leases, with add, edit and delete.~~ Done.
-3. **Tenant rent screens:** need backend work first. Payments and notifications must be limited to the signed-in user (today `/tenant/payment` and `/tenant/notification` return everyone’s), and tenants need an endpoint for their own lease.
+3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
 4. **Landlord collections:** need landlord payment, monthly summary and reminder endpoints. They replace the sample numbers on Overview, Tenants and Profile.
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
-6. **Push notifications from the backend:** the app receives Firebase pushes but doesn’t send its id to the server yet. The backend needs to store each phone’s id (added on login, removed on log out) and send with the Firebase Admin SDK. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1, so that switch belongs in the same change.
+6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.
 7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.
 
 Also worth fixing in the backend: deleting a property leaves its rooms behind. The app avoids the worst case by not deleting anything that still has an active lease.

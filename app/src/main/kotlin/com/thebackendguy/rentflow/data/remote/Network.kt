@@ -47,6 +47,7 @@ object Network {
 
     val auth: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
     val landlord: LandlordApi by lazy { retrofit.create(LandlordApi::class.java) }
+    val notifications: NotificationApi by lazy { retrofit.create(NotificationApi::class.java) }
 
     /** For file storage: it rejects requests that carry our Authorization header. */
     val storage: OkHttpClient by lazy {

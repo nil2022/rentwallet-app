@@ -29,8 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -66,8 +64,6 @@ import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-data class Notice(val title: String, val message: String)
 
 /* ------------------------------ Top bar ------------------------------ */
 
@@ -146,10 +142,10 @@ fun RfTopBar(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     chip: String? = null,
-    notices: List<Notice> = emptyList(),
+    unread: Int = 0,
+    onNotifications: (() -> Unit)? = null,
     onProfile: (() -> Unit)? = null
 ) {
-    var showNotices by remember { mutableStateOf(false) }
     Column(
         modifier
             .zIndex(1f)
@@ -165,8 +161,10 @@ fun RfTopBar(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 HeaderClock()
                 Box {
-                    SquareButton({ showNotices = true }) { LIcon(Lucide.Bell, tint = Rf.OnSurface, contentDescription = "Notifications") }
-                    if (notices.isNotEmpty()) {
+                    SquareButton(onNotifications) {
+                        LIcon(Lucide.Bell, tint = Rf.OnSurface, contentDescription = if (unread > 0) "Notifications, $unread unread" else "Notifications")
+                    }
+                    if (unread > 0) {
                         Box(
                             Modifier
                                 .align(Alignment.TopEnd)
@@ -179,23 +177,7 @@ fun RfTopBar(
                                 .padding(horizontal = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = notices.size.toString(), style = RfType.LabelSm.copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.sp), color = Rf.OnError)
-                        }
-                    }
-                    DropdownMenu(expanded = showNotices, onDismissRequest = { showNotices = false }) {
-                        if (notices.isEmpty()) {
-                            DropdownMenuItem(text = { Text("You’re all caught up", style = RfType.BodyMd) }, onClick = { showNotices = false })
-                        }
-                        notices.forEach { notice ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column(Modifier.widthIn(max = 260.dp).padding(vertical = 4.dp)) {
-                                        Text(notice.title, style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                                        Text(notice.message, style = RfType.BodySm, color = Rf.OnSurfaceVariant)
-                                    }
-                                },
-                                onClick = { showNotices = false }
-                            )
+                            Text(text = if (unread > 99) "99+" else unread.toString(), style = RfType.LabelSm.copy(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.sp), color = Rf.OnError)
                         }
                     }
                 }
