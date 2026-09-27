@@ -1,0 +1,25 @@
+package com.thebackendguy.rentflow.push
+
+import android.util.Log
+import com.google.firebase.messaging.FirebaseMessagingService
+import com.google.firebase.messaging.RemoteMessage
+
+/**
+ * Receives pushes from Firebase. While the app is in the background, Android shows
+ * "notification" pushes by itself; this only runs for them when the app is open,
+ * and for "data" pushes (title and body keys) at any time.
+ */
+class RentFlowMessagingService : FirebaseMessagingService() {
+    override fun onMessageReceived(message: RemoteMessage) {
+        val title = message.notification?.title ?: message.data["title"]
+        val body = message.notification?.body ?: message.data["body"]
+        if (title == null && body == null) return
+        Notifications.show(this, title, body)
+    }
+
+    // A new install or a reset token. The backend will store it once it has an endpoint for it.
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onNewToken(token: String) {
+        Log.d(Notifications.TAG, "New FCM token: $token")
+    }
+}

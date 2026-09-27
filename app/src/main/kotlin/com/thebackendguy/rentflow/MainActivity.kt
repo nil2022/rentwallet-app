@@ -1,11 +1,15 @@
 package com.thebackendguy.rentflow
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -31,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -42,6 +47,7 @@ import com.thebackendguy.rentflow.data.UserRole
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.session.SessionStore
 import com.thebackendguy.rentflow.data.settled
+import com.thebackendguy.rentflow.push.Notifications
 import com.thebackendguy.rentflow.ui.components.AppDrawer
 import com.thebackendguy.rentflow.ui.components.Notice
 import com.thebackendguy.rentflow.ui.components.SystemBars
@@ -114,6 +120,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         SessionStore.init(applicationContext)
         ThemeMode.init(applicationContext)
+        Notifications.createChannel(applicationContext)
+        Notifications.logToken()
         // Photos download with the same timeouts as the API
         SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
@@ -205,6 +213,15 @@ private fun RentFlowApp() {
 
     // Check the saved token and refresh the name and contact details
     LaunchedEffect(Unit) { AuthRepository.refreshProfile() }
+
+    // Ask for notification permission once the user is inside the app (Android 13+)
+    val context = LocalContext.current
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(isSignedInScreen) {
+        if (isSignedInScreen && Notifications.needsPermission(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     // The session ended (token rejected, or the app restarted without "Remember me")
     LaunchedEffect(session == null, isSignedInScreen) {

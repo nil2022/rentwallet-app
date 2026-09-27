@@ -221,6 +221,7 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Theme | Light and dark palettes in [`Color.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Color.kt); the choice is saved in SharedPreferences |
 | Session | Token and account details in SharedPreferences (only with “Remember me”) |
 | Navigation | A back stack of screens in Compose state, no navigation library |
+| Push notifications | Firebase Cloud Messaging (Firebase BoM 34.19, google-services plugin 4.5) |
 | Sample data | [`DemoData.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/data/DemoData.kt) for rent, payments and wallet |
 
 ## Project structure
@@ -236,6 +237,7 @@ app/src/main/
 │   │   ├── DemoData.kt           # Sample rent, payments and wallet; ₹ formatting
 │   │   ├── session/              # SessionStore: the signed-in account and token
 │   │   └── remote/               # ApiConfig (server address), Retrofit APIs, DTOs, photo uploads
+│   ├── push/                     # Firebase messaging service, notification channel, FCM token in Logcat
 │   └── ui/
 │       ├── theme/                # Light and dark colours, type, theme switch
 │       ├── icons/                # Lucide.kt (generated), LucideIcon.kt
@@ -247,7 +249,7 @@ app/src/main/
 │           └── landlord/         # Overview, Properties, Rooms, Tenants, leases, Profile
 ├── res/
 │   ├── font/plus_jakarta_sans.ttf
-│   ├── drawable/                 # Launcher icon layers
+│   ├── drawable/                 # Launcher icon layers, notification icon
 │   ├── xml/                      # Network security, FileProvider paths for new photos
 │   ├── values-night/             # Dark launch-screen background
 │   └── values/                   # App name, colours, window theme
@@ -256,8 +258,9 @@ app/src/main/
 
 ## Build and run
 
-1. Open the project in Android Studio.
-2. Let Gradle sync, then run the **app** configuration on a device or emulator (Android 9 or newer).
+1. Download `google-services.json` from the Firebase console (Project settings → Your apps → RentFlow) and put it in `app/`. It is kept out of git, and the build fails without it.
+2. Open the project in Android Studio.
+3. Let Gradle sync, then run the **app** configuration on a device or emulator (Android 9 or newer). For push notifications the emulator needs a Google Play system image.
 
 From the command line:
 
@@ -284,6 +287,10 @@ adb reverse tcp:4000 tcp:4000
 
 On Wi-Fi, use your PC’s IP instead of `localhost`, and add that IP to [`network_security_config.xml`](app/src/main/res/xml/network_security_config.xml). Plain `http` is allowed only for the addresses listed there; the live server uses `https`.
 
+### Testing push notifications
+
+After login the app asks for notification permission (Android 13+). Filter Logcat by `RentFlowPush` and copy the `FCM token`. In the Firebase console open Messaging, create a notification, and use **Send test message** with that token. The notification shows with the app in the background and in the foreground, and opens the app when tapped.
+
 ## What’s next
 
 The app uses the same backend as the web app (`rent-management`, Express and MongoDB, base path `/api/v1`).
@@ -293,7 +300,8 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 3. **Tenant rent screens:** need backend work first. Payments and notifications must be limited to the signed-in user (today `/tenant/payment` and `/tenant/notification` return everyone’s), and tenants need an endpoint for their own lease.
 4. **Landlord collections:** need landlord payment, monthly summary and reminder endpoints. They replace the sample numbers on Overview, Tenants and Profile.
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
-6. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.
+6. **Push notifications from the backend:** the app receives Firebase pushes but doesn’t send its id to the server yet. The backend needs to store each phone’s id (added on login, removed on log out) and send with the Firebase Admin SDK. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1, so that switch belongs in the same change.
+7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.
 
 Also worth fixing in the backend: deleting a property leaves its rooms behind. The app avoids the worst case by not deleting anything that still has an active lease.
 

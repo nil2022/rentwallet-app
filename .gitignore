@@ -23,3 +23,5 @@ local.properties
 /.idea/httpRequests/
 
 .DS_Store
+# Firebase config: kept out of the public repo, download it from the Firebase console
+app/google-services.json
