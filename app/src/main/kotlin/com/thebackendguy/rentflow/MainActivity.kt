@@ -106,6 +106,9 @@ private data class Route(val screen: Screen, val a: String? = null, val b: Strin
 
 private val StackSaver = listSaver<List<Route>, String>(save = { stack -> stack.map { it.encode() } }, restore = { it.map(Route::decode) })
 
+/** Marks a Record Payment route that edits a saved bill: "edit:<bill id>". */
+private const val EDIT_BILL = "edit:"
+
 private val AuthScreens = setOf(Screen.Login, Screen.ForgotPassword, Screen.Register)
 private val TenantTabScreens = listOf(Screen.TenantHome, Screen.PaymentHistory, Screen.TenantProfile)
 private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Rooms, Screen.Tenants, Screen.RentCollection)
@@ -449,6 +452,8 @@ private fun RentFlowApp() {
                             onEdit = { go(Screen.TenantForm, a) },
                             onAssignRoom = { go(Screen.AddTenant, a) },
                             onOpenRoom = { go(Screen.RoomDetails, it) },
+                            onRecordPayment = { month -> go(Screen.RecordPayment, a, month) },
+                            onEditBill = { billId -> go(Screen.RecordPayment, a, "$EDIT_BILL$billId") },
                             onDeleted = ::back
                         )
 
@@ -482,7 +487,8 @@ private fun RentFlowApp() {
                         Screen.RentCollection -> RentCollectionScreen(
                             shell = shell,
                             onRecord = { go(Screen.PickBillTenant) },
-                            onRecordFor = { tenantId, month -> go(Screen.RecordPayment, tenantId, month) }
+                            onRecordFor = { tenantId, month -> go(Screen.RecordPayment, tenantId, month) },
+                            onEditBill = { tenantId, billId -> go(Screen.RecordPayment, tenantId, "$EDIT_BILL$billId") }
                         )
 
                         Screen.PickBillTenant -> BillTenantPickerScreen(
@@ -491,11 +497,11 @@ private fun RentFlowApp() {
                             onPick = { replace(Screen.RecordPayment, it) }
                         )
 
-                        // a = tenant id, b = billing month ("YYYY-MM", this month when null)
+                        // a = tenant id, b = billing month ("YYYY-MM", this month when null) or "edit:<bill id>"
                         Screen.RecordPayment -> RecordPaymentScreen(
                             tenantId = a.orEmpty(),
-                            initialMonth = b,
-                            editBillId = null,
+                            initialMonth = b?.takeUnless { it.startsWith(EDIT_BILL) },
+                            editBillId = b?.takeIf { it.startsWith(EDIT_BILL) }?.removePrefix(EDIT_BILL),
                             shell = shell,
                             onBack = ::back,
                             onDone = ::back

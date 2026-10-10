@@ -6,12 +6,15 @@ import com.thebackendguy.rentflow.data.remote.BillDto
 import com.thebackendguy.rentflow.data.remote.BillTotalsDto
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.remote.apiCall
+import com.thebackendguy.rentflow.data.remote.discard
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -104,6 +107,24 @@ object PaymentStore {
     /** Saves a new bill ([billId] null) or changes one; every screen showing bills loads again. */
     suspend fun save(billId: String?, body: JsonObject): ApiResult<ApiEnvelope<BillDto>> {
         val result = apiCall { if (billId == null) api.createBill(body) else api.updateBill(body) }
+        if (result is ApiResult.Ok) changed()
+        return result
+    }
+
+    /** Saves a bill's meter photo ([key] null removes it). */
+    suspend fun setMeterPhoto(billId: String, key: String?): ApiResult<Unit> = changing {
+        apiCall { api.setMeterPhoto(buildJsonObject { put("paymentId", billId); put("meterPhoto", key) }) }.discard()
+    }
+
+    /** Saves a bill's payment proof ([key] null removes it). */
+    suspend fun setProof(billId: String, key: String?): ApiResult<Unit> = changing {
+        apiCall { api.updateBill(buildJsonObject { put("paymentId", billId); put("paymentProof", key) }) }.discard()
+    }
+
+    suspend fun delete(billId: String): ApiResult<Unit> = changing { apiCall { api.deleteBill(billId) }.discard() }
+
+    private suspend fun <T> changing(block: suspend () -> ApiResult<T>): ApiResult<T> {
+        val result = block()
         if (result is ApiResult.Ok) changed()
         return result
     }

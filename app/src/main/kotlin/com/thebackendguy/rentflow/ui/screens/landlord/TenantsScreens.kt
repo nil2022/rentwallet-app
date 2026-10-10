@@ -73,7 +73,6 @@ import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.SectionHead
 import com.thebackendguy.rentflow.ui.components.Segmented
 import com.thebackendguy.rentflow.ui.components.SwitchRow
-import com.thebackendguy.rentflow.ui.components.TitledCard
 import com.thebackendguy.rentflow.ui.components.Toasts
 import com.thebackendguy.rentflow.ui.components.photoChooser
 import com.thebackendguy.rentflow.ui.components.pressable
@@ -272,6 +271,8 @@ fun TenantDetailsScreen(
     onEdit: () -> Unit,
     onAssignRoom: () -> Unit,
     onOpenRoom: (String) -> Unit,
+    onRecordPayment: (month: String?) -> Unit,
+    onEditBill: (billId: String) -> Unit,
     onDeleted: () -> Unit
 ) {
     val state = portfolioState()
@@ -346,17 +347,6 @@ fun TenantDetailsScreen(
                     }
                 }
 
-                // Sample data until the payments screens are built
-                val rent = demoRent(tenant, room?.rent ?: 0.0)
-                TitledCard("Rent status", caption = LocalDate.now().monthLabel()) {
-                    IconRows(
-                        listOf(
-                            IconDetail(Lucide.CircleCheck, "Payment status", if (rent.paid) "Paid" else "Due"),
-                            IconDetail(Lucide.History, "Last payment", rent.lastPayment),
-                            IconDetail(Lucide.Wallet, "Wallet status", if (rent.paid) "Credited" else "Pending")
-                        )
-                    )
-                }
                 ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Rf.OnSecondary, Modifier.fillMaxWidth(), doneLabel = "Reminder sent")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ActionButton("Change room", Lucide.DoorOpen, Rf.Container, Rf.Primary, Modifier.weight(1f), onClick = onAssignRoom)
@@ -372,6 +362,9 @@ fun TenantDetailsScreen(
                     PrimaryButton("Assign a room", onClick = onAssignRoom, showArrow = false, modifier = Modifier.padding(top = 16.dp))
                 }
             }
+
+            // Every month's bill, from the bills API (the web's Payment History card)
+            PaymentHistoryCard(tenant.id, tenant.fullName, onRecord = onRecordPayment, onEditBill = onEditBill)
 
             Text(
                 "Delete tenant",

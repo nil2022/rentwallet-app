@@ -3,10 +3,13 @@ package com.thebackendguy.rentflow.data.remote
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -43,6 +46,14 @@ interface PaymentApi {
     /** Changes a bill; `paymentId` goes in the body. The tenant's advance is worked out again. */
     @PATCH("landlord/payment")
     suspend fun updateBill(@Body body: JsonObject): ApiEnvelope<BillDto>
+
+    /** Adds, replaces or (null) removes the meter photo: `{ paymentId, meterPhoto }`. */
+    @PUT("landlord/payment/meter-photo")
+    suspend fun setMeterPhoto(@Body body: JsonObject): ApiEnvelope<BillDto>
+
+    /** Deletes a bill; advance it gave to later bills is taken back from them. */
+    @DELETE("landlord/payment/{id}")
+    suspend fun deleteBill(@Path("id") id: String): ApiEnvelope<JsonElement>
 }
 
 /** The tenant a bill belongs to, as the API embeds it. */
