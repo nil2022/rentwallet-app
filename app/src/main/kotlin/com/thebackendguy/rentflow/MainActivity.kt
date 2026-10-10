@@ -42,6 +42,7 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.thebackendguy.rentflow.data.AuthRepository
 import com.thebackendguy.rentflow.data.Demo
+import com.thebackendguy.rentflow.data.apiMonth
 import com.thebackendguy.rentflow.data.LandlordStore
 import com.thebackendguy.rentflow.data.NotificationStore
 import com.thebackendguy.rentflow.data.UserRole
@@ -73,6 +74,7 @@ import com.thebackendguy.rentflow.ui.screens.landlord.RoomDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RentCollectionScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RentHistoryScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.showCollectionMonth
+import com.thebackendguy.rentflow.ui.screens.landlord.showOverdueBills
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantDetailsScreen
@@ -89,6 +91,7 @@ import com.thebackendguy.rentflow.ui.theme.LightPalette
 import com.thebackendguy.rentflow.ui.theme.RentFlowTheme
 import com.thebackendguy.rentflow.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
+import java.time.YearMonth
 
 private enum class Screen {
     Login, ForgotPassword, Register,
@@ -377,13 +380,20 @@ private fun RentFlowApp() {
                         /* ---------- Landlord ---------- */
                         Screen.LandlordOverview -> LandlordOverviewScreen(
                             firstName = user?.firstName.orEmpty(),
-                            tenants = Demo.tenants,
                             shell = shell,
-                            onOpenTenants = { openTab(Screen.Tenants) },
+                            onRecordPayment = { go(Screen.PickBillTenant) },
+                            onOpenCollection = {
+                                showCollectionMonth(YearMonth.now().apiMonth(), null)
+                                openTab(Screen.RentCollection)
+                            },
+                            onOpenOverdue = {
+                                showOverdueBills()
+                                openTab(Screen.RentCollection)
+                            },
+                            onCollect = { tenantId, month -> go(Screen.RecordPayment, tenantId, month) },
                             onOpenProperties = { openTab(Screen.Properties) },
                             onOpenProperty = { go(Screen.PropertyDetails, it) },
-                            onAddProperty = { go(Screen.PropertyForm) },
-                            onAddTenant = { go(Screen.AddTenant) }
+                            onAddProperty = { go(Screen.PropertyForm) }
                         )
 
                         Screen.Properties -> PropertiesScreen(

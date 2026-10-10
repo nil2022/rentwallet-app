@@ -122,6 +122,13 @@ internal fun showCollectionMonth(month: String, propertyId: String?) {
     CollectionMemory.overdueView = false
 }
 
+/** Opens Rent Collection on the bills still unpaid from earlier months, across all properties. */
+internal fun showOverdueBills() {
+    CollectionMemory.propertyId = null
+    CollectionMemory.filter = 0
+    CollectionMemory.overdueView = true
+}
+
 private enum class BillFilter(val key: String, val label: String) {
     All("all", "All"), Pending("pending", "Pending"), Partial("partial", "Partial"), Paid("paid", "Paid")
 }

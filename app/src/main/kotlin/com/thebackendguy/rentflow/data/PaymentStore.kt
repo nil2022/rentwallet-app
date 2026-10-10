@@ -93,6 +93,33 @@ data class CollectionBills(val bills: List<BillDto>, val totals: BillTotalsDto?,
 }
 
 /**
+ * What Overview shows about rent this month (the web's useRentOverview): this month's
+ * [bills], the [overdueBills] still unpaid from earlier months (oldest first), and the
+ * money: [billed], [collected] (money received plus advance used, so never more than
+ * billed) and the [advance] held across all months.
+ */
+data class RentOverview(
+    val month: YearMonth,
+    val bills: List<BillDto>,
+    val overdueBills: List<BillDto>,
+    val billed: Double,
+    val collected: Double,
+    val advance: Double
+) {
+    val percent: Int = if (billed > 0) Math.round(collected / billed * 100).toInt() else 0
+    val overdueAmount: Double = overdueBills.sumOf { it.pendingAmount }
+    val overdueTenants: Int = overdueBills.map { it.tenantId }.distinct().size
+    val overdueSince: String? = overdueBills.firstOrNull()?.monthYear
+
+    // Electricity in this month's bills
+    private val metered = bills.filter { it.electricity != null }
+    val units: Double = metered.sumOf { it.electricity?.unitsConsumed ?: 0.0 }
+    val electricityAmount: Double = metered.sumOf { it.electricity?.amount ?: 0.0 }
+    val readRooms: Int = metered.map { it.roomId }.distinct().size
+    val billedRooms: Int = bills.map { it.roomId }.distinct().size
+}
+
+/**
  * The landlord's bills from the API (the calls the web's Rent Collection makes).
  * Screens load what they show; [version] goes up after any change to a bill, so they
  * load again.
@@ -156,6 +183,42 @@ object PaymentStore {
         ApiResult.Ok(ids.associateWith { id ->
             rentStatus(current[id], overdue[id].orEmpty(), held[id].orEmpty().sumOf { it.advanceLeft })
         })
+    }
+
+    /** Overview's rent figures, from the web dashboard's four calls. */
+    suspend fun overview(): ApiResult<RentOverview> = coroutineScope {
+        val now = YearMonth.now()
+        val month = now.apiMonth()
+        val monthCall = async { apiCall { api.bills(monthYear = month, limit = PAGE_SIZE) } }
+        val pendingCall = async { apiCall { api.bills(status = "pending", limit = PAGE_SIZE) } }
+        val partialCall = async { apiCall { api.bills(status = "partial", limit = PAGE_SIZE) } }
+        val advanceCall = async { apiCall { api.bills(hasAdvance = true, limit = PAGE_SIZE) } }
+        val monthBills = when (val r = monthCall.await()) {
+            is ApiResult.Fail -> return@coroutineScope r
+            is ApiResult.Ok -> r.value
+        }
+        val unpaid = mutableListOf<BillDto>()
+        for (call in listOf(pendingCall, partialCall)) {
+            when (val r = call.await()) {
+                is ApiResult.Fail -> return@coroutineScope r
+                is ApiResult.Ok -> unpaid += r.value.data.orEmpty()
+            }
+        }
+        // The advance call is extra: without it the advance shows as none
+        val advance = (advanceCall.await() as? ApiResult.Ok)?.value
+        val bills = monthBills.data.orEmpty()
+        val summary = monthBills.summary
+        ApiResult.Ok(
+            RentOverview(
+                month = now,
+                bills = bills,
+                overdueBills = unpaid.filter { it.monthYear < month }
+                    .sortedWith(compareBy<BillDto> { it.monthYear }.thenByDescending { it.pendingAmount }),
+                billed = summary?.totalDue ?: bills.sumOf { it.totalDue },
+                collected = summary?.totalSettled ?: bills.sumOf { it.totalDue - it.pendingAmount },
+                advance = advance?.summary?.totalAdvanceHeld ?: advance?.data.orEmpty().sumOf { it.advanceLeft }
+            )
+        )
     }
 
     /** One tenant's bills, one room's bills, or one month's bills (newest month first). */

@@ -112,10 +112,7 @@ data class QuickAction(val label: String, val icon: LucideIcon, val tone: QuickT
 @Composable
 fun QuickActions(actions: List<QuickAction>) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "Quick actions", style = RfType.LabelMd, color = Rf.OnSurfaceVariant)
-            Caption("Swipe for more")
-        }
+        Text(text = "Quick actions", style = RfType.LabelMd, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(horizontal = 2.dp))
         Row(
             Modifier
                 .bleed(16.dp)

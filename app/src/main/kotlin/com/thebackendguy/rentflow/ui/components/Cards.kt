@@ -169,13 +169,16 @@ data class HealthTileSpec(
     val titleColor: Color? = null,
     val subColor: Color? = null,
     // true while the figures load: the badge, title and caption pulse instead
-    val loading: Boolean = false
+    val loading: Boolean = false,
+    // a tile that opens something, with a small [link] under the caption
+    val onClick: (() -> Unit)? = null,
+    val link: String? = null
 )
 
 @Composable
 fun HealthTile(spec: HealthTileSpec, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
-    Column(modifier.softShadow(shape).clip(shape).background(spec.background ?: Rf.Lowest).padding(14.dp)) {
+    Column(modifier.pressable(spec.onClick, pressScale = 0.97f).softShadow(shape).clip(shape).background(spec.background ?: Rf.Lowest).padding(14.dp)) {
         // On a tinted tile the placeholder bars take the tile's own shade
         val bone = Rf.Container
         val boneSoft = if (spec.background != null) Rf.Container else Rf.Low
@@ -198,9 +201,16 @@ fun HealthTile(spec: HealthTileSpec, modifier: Modifier = Modifier) {
             Column {
                 Text(text = spec.title, style = RfType.HeadlineSm, color = spec.titleColor ?: Rf.OnSurface, maxLines = 1)
                 Text(
-                    text = spec.sub, style = RfType.LabelSm, color = spec.subColor ?: Rf.OnSurfaceVariant, maxLines = 1,
+                    // Two lines, so "of ₹… billed • ₹… advance" shows in full
+                    text = spec.sub, style = RfType.LabelSm, color = spec.subColor ?: Rf.OnSurfaceVariant, maxLines = 2,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)
                 )
+                if (spec.link != null) {
+                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(spec.link, style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = spec.subColor ?: Rf.Primary)
+                        LIcon(Lucide.ChevronRight, size = 12.dp, tint = spec.subColor ?: Rf.Primary)
+                    }
+                }
             }
         }
     }
