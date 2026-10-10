@@ -5,11 +5,11 @@
 <h1 align="center">RentFlow for Android</h1>
 
 <p align="center">
-  A rent app for tenants and landlords. Landlords manage properties, rooms, tenants and leases; tenants pay rent and keep receipts.<br>
+  A rent app for tenants and landlords. Landlords manage properties, rooms and the tenants living in them; tenants pay rent and keep receipts.<br>
   Built with Kotlin and Jetpack Compose, and designed to match the RentFlow web app’s phone layout.
 </p>
 
-> **Status:** sign-in, and the landlord’s properties, rooms, tenants and leases, run on the **live RentFlow API**, the same one the web app uses. Rent collection, payments and the wallet still show **sample numbers** until their APIs exist (see [What’s next](#whats-next)).
+> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. Rent collection, payments and the wallet still show **sample numbers** until their APIs exist (see [What’s next](#whats-next)).
 
 ## Contents
 
@@ -50,7 +50,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 09 Overview | 10 Tenants | 11 Tenant Details | 12 Profile |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/09-landlord-overview.png" width="170" alt="Landlord overview"> | <img src="docs/screenshots/10-tenants.png" width="170" alt="Tenants"> | <img src="docs/screenshots/11-tenant-details.png" width="170" alt="Tenant details"> | <img src="docs/screenshots/12-landlord-profile.png" width="170" alt="Landlord profile"> |
-| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | Contact details and the full lease. Call, edit, end the lease or delete the tenant. | Real owner details and counts. Edit profile and change password. |
+| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | Contact details, their room with its rent and deposit. Call, edit, change room, remove from the room or delete the tenant. | Real owner details and counts. Edit profile and change password. |
 
 ### Properties and rooms
 
@@ -62,14 +62,14 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 19 Room: let | 19 Room: vacant | 20 Add or Edit Room |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/19-room-let.png" width="220" alt="Room with a tenant"> | <img src="docs/screenshots/19-room-vacant.png" width="220" alt="Vacant room"> | <img src="docs/screenshots/20-room-form.png" width="220" alt="Add room"> |
-| The current tenant and lease terms. “End lease” frees the room. | A vacant room offers “Assign tenant”. | Room number, floor, occupancy, rent, deposit, facilities and photos. |
+| Who lives there (“1 of 2 tenants”), each with “Remove from room”. A room with space offers “Assign another tenant”. | A vacant room offers “Assign tenant”. | Room number, floor, occupancy, rent, deposit, facilities and photos. |
 
-### Adding tenants and leases
+### Adding tenants and giving them rooms
 
-| 21 Add tenant: details | 21 Add tenant: room | 21 Add tenant: lease | 22 Edit Tenant | 23 Assign Room |
-|:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/21-add-tenant-details.png" width="135" alt="Add tenant, step 1"> | <img src="docs/screenshots/21-add-tenant-room.png" width="135" alt="Add tenant, step 2"> | <img src="docs/screenshots/21-add-tenant-lease.png" width="135" alt="Add tenant, step 3"> | <img src="docs/screenshots/22-edit-tenant.png" width="135" alt="Edit tenant"> | <img src="docs/screenshots/23-assign-room.png" width="135" alt="Assign room"> |
-| Name, mobile, sign-in email, initial password and an optional photo. | Pick a property, then one of its vacant rooms. The room can be skipped. | Move-in date, length, due day, rent, deposit and terms, with the web’s defaults. | Name, mobile, photo and whether the account is active. The email is locked. | From a vacant room: a tenant without a room, or a new one. |
+| 21 Add tenant: details | 21 Add tenant: room | 22 Edit Tenant | 23 Assign Room |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/21-add-tenant-details.png" width="160" alt="Add tenant, step 1"> | <img src="docs/screenshots/21-add-tenant-room.png" width="160" alt="Add tenant, step 2"> | <img src="docs/screenshots/22-edit-tenant.png" width="160" alt="Edit tenant"> | <img src="docs/screenshots/23-assign-room.png" width="160" alt="Assign room"> |
+| Name, mobile, sign-in email, initial password and an optional photo. | Pick a property, then a room with space. Rent and deposit are the room’s. The room can be skipped. The same screen changes a tenant’s room. | Name, mobile, photo and whether the account is active. The email is locked. | From a room with space: a tenant without a room, or a new one. |
 
 ### Profile settings
 
@@ -80,10 +80,10 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 
 ### Confirmations and list states
 
-| End lease | Delete | Loading | Empty | Can’t connect |
+| Remove from room | Delete | Loading | Empty | Can’t connect |
 |:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/sheet-end-lease.png" width="135" alt="End lease confirmation"> | <img src="docs/screenshots/sheet-delete-property.png" width="135" alt="Delete property confirmation"> | <img src="docs/screenshots/state-loading.png" width="135" alt="Loading"> | <img src="docs/screenshots/state-empty.png" width="135" alt="Empty list"> | <img src="docs/screenshots/state-error.png" width="135" alt="Error with retry"> |
-| Says what happens before a lease ends. | Deletes ask first. A property, room or tenant with an active lease can’t be deleted until the lease ends. | Placeholder cards while a list loads. | A first-time landlord sees what to add first. | The reason and a “Try again” button. |
+| <img src="docs/screenshots/sheet-end-lease.png" width="135" alt="Remove from room confirmation"> | <img src="docs/screenshots/sheet-delete-property.png" width="135" alt="Delete property confirmation"> | <img src="docs/screenshots/state-loading.png" width="135" alt="Loading"> | <img src="docs/screenshots/state-empty.png" width="135" alt="Empty list"> | <img src="docs/screenshots/state-error.png" width="135" alt="Error with retry"> |
+| Says what happens before a tenant leaves a room. | Deletes ask first. A property or room with tenants can’t be deleted until they are removed from it. | Placeholder cards while a list loads. | A first-time landlord sees what to add first. | The reason and a “Try again” button. |
 
 After every save or delete, a short message such as “Property saved” floats up from the bottom.
 
@@ -135,11 +135,11 @@ flowchart TD
         RD -->|"Assign tenant"| AR["23 Assign Room"]
         RD -->|"Tap the tenant"| TD["11 Tenant Details"]
         TS -->|"Tap a tenant"| TD
-        TS -->|"Add tenant"| AT["21 Add tenant: details, room, lease"]
+        TS -->|"Add tenant"| AT["21 Add tenant: details, room"]
         LO -->|"Add tenant"| AT
         AR -->|"Add a new tenant"| AT
         TD -->|"Edit"| TF["22 Edit Tenant"]
-        TD -->|"Assign a room"| AT
+        TD -->|"Assign or change room"| AT
         LP -->|"Edit"| EP["24 Edit Profile"]
         LP -->|"Change password"| CP["25 Change Password"]
     end
@@ -161,15 +161,15 @@ How navigation works:
 | Screen | From the API | Sample data |
 |---|---|---|
 | Login, OTP, Forgot password, Register | Everything | None |
-| Landlord Overview | Property, tenant and vacant-room counts, leases ending soon, the first three property cards | Payment ledger, sub-meter card |
+| Landlord Overview | Property, tenant, vacant-room and rooms-with-space counts, the first three property cards | Payment ledger, sub-meter card |
 | Properties, property details, rooms | Everything: list, details, add, edit, delete, photos | None |
-| Tenants, tenant details | Names, contacts, rooms, leases. Add, edit, delete, assign a room, end a lease | Paid / Due badges, rent status, tenant alerts, Send reminder |
+| Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room | Paid / Due badges, rent status, tenant alerts, Send reminder |
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |
 | Tenant Home, Pay Rent, Payments, Receipt | None yet | Everything |
 | Bell and notifications (both roles) | Unread count, the list 20 at a time | None |
 
-Every call is one the web app already makes. The landlord endpoints are under `/api/v1/landlord` (property, room, tenant, lease, profile), photos go through `/api/v1/upload/presigned`, and sign-in uses `/api/v1/{landlord|tenant}/auth`. Notifications use `/api/v1/notification` and `/api/v1/notification/count`, and the phone's FCM token goes to `PUT /api/v1/fcm-token`.
+Every call is one the web app already makes. The landlord endpoints are under `/api/v1/landlord` (property, room, tenant, `tenant/assign-room`, profile). Edits send the record’s id in the body, not the URL, photos go through `/api/v1/upload/presigned`, and sign-in uses `/api/v1/{landlord|tenant}/auth`. Notifications use `/api/v1/notification` and `/api/v1/notification/count`, and the phone's FCM token goes to `PUT /api/v1/fcm-token`.
 
 ## Design system
 
@@ -249,7 +249,7 @@ app/src/main/
 │           ├── NotificationsSheet.kt # The bell's bottom sheet: Today / Yesterday / Earlier, Load more
 │           ├── auth/             # Login, Forgot Password, Register
 │           ├── tenant/           # Home, Pay Rent, Payment Success, History, Receipt, Profile
-│           └── landlord/         # Overview, Properties, Rooms, Tenants, leases, Profile
+│           └── landlord/         # Overview, Properties, Rooms, Tenants, room assignment, Profile
 ├── res/
 │   ├── font/plus_jakarta_sans.ttf
 │   ├── drawable/                 # Launcher icon layers, notification icon
@@ -308,14 +308,14 @@ Every time Overview or the tenant Home opens, the app sends its FCM token to the
 The app uses the same backend as the web app (`rent-management`, Express and MongoDB, base path `/api/v1`).
 
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
-2. ~~**Landlord data:** properties, rooms, tenants and leases, with add, edit and delete.~~ Done.
+2. ~~**Landlord data:** properties, rooms, tenants and who lives in which room, with add, edit and delete.~~ Done.
 3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
 4. **Landlord collections:** need landlord payment, monthly summary and reminder endpoints. They replace the sample numbers on Overview, Tenants and Profile.
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
 6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.
 7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.
 
-Also worth fixing in the backend: deleting a property leaves its rooms behind. The app avoids the worst case by not deleting anything that still has an active lease.
+Also worth fixing in the backend: deleting a property leaves its rooms behind. The app avoids the worst case by not deleting a property or room that still has tenants.
 
 ## Credits and licences
 

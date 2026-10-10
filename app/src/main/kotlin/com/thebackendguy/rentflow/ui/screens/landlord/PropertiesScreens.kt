@@ -240,7 +240,7 @@ fun PropertyDetailsScreen(
                 ConfirmSheet(
                     icon = Lucide.Trash2,
                     title = "Delete ${property.propertyName}?",
-                    message = if (occupied) "Some of its rooms still have tenants. End their leases first, then delete the property."
+                    message = if (occupied) "Some of its rooms still have tenants. Remove them from their rooms first, then delete the property."
                     else "The property is removed permanently. This can’t be undone.",
                     confirmLabel = if (occupied) "OK" else "Delete property",
                     busy = deleting,

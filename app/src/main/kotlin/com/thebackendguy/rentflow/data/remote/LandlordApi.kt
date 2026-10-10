@@ -1,6 +1,7 @@
 package com.thebackendguy.rentflow.data.remote
 
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -9,7 +10,7 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/** The landlord endpoints the web app uses: properties, rooms, tenants, leases and the profile. */
+/** The landlord endpoints the web app uses: properties, rooms, tenants and their rooms, and the profile. */
 interface LandlordApi {
     @GET("landlord/property")
     suspend fun properties(@Query("page") page: Int, @Query("limit") limit: Int): ApiEnvelope<List<PropertyDto>>
@@ -41,7 +42,7 @@ interface LandlordApi {
     @DELETE("landlord/room/{id}")
     suspend fun deleteRoom(@Path("id") id: String): ApiEnvelope<JsonElement>
 
-    /** Each tenant comes with its active lease (room and property included), or null. */
+    /** Each tenant comes with its room and property, or null when they have none. */
     @GET("landlord/tenant")
     suspend fun tenants(@Query("page") page: Int, @Query("limit") limit: Int): ApiEnvelope<List<TenantDto>>
 
@@ -55,13 +56,13 @@ interface LandlordApi {
     @DELETE("landlord/tenant/{id}")
     suspend fun deleteTenant(@Path("id") id: String): ApiEnvelope<JsonElement>
 
-    /** Assigning a room: the API marks the room taken once it's full. */
-    @POST("landlord/lease")
-    suspend fun createLease(@Body body: LeaseBody): ApiEnvelope<LeaseDto>
-
-    /** Ending a lease (status "ended") frees the room. */
-    @PATCH("landlord/lease/{id}")
-    suspend fun updateLeaseStatus(@Path("id") id: String, @Body body: LeaseStatusBody): ApiEnvelope<LeaseDto>
+    /**
+     * Puts a tenant in a room, moves them, or (roomId null) takes them out of it.
+     * The body is `{ tenantId, roomId }`; roomId must be sent even when null, so it's
+     * built as JSON rather than a class (the encoder leaves nulls out). A full room is a 409.
+     */
+    @POST("landlord/tenant/assign-room")
+    suspend fun assignRoom(@Body body: JsonObject): ApiEnvelope<TenantDto>
 
     /** The account's id travels in the body as `userId`. */
     @PATCH("landlord")

@@ -24,8 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.thebackendguy.rentflow.data.LandlordStore
 import com.thebackendguy.rentflow.data.Portfolio
-import com.thebackendguy.rentflow.data.apiDate
-import com.thebackendguy.rentflow.data.monthLabel
 import com.thebackendguy.rentflow.data.PayStatus
 import com.thebackendguy.rentflow.data.Tenant
 import com.thebackendguy.rentflow.data.inr
@@ -50,7 +48,6 @@ import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.screens.Shell
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
-import java.time.LocalDate
 
 /** How many properties the overview shows before "View all". */
 private const val PROPERTY_PREVIEW = 3
@@ -204,21 +201,17 @@ private fun portfolioTiles(portfolio: Portfolio?): List<HealthTileSpec> {
             HealthTileSpec(Lucide.Building2, "", "— Properties", "Loading…", Rf.High, Rf.Primary, Rf.Secondary),
             HealthTileSpec(Lucide.Users, "", "— Tenants", "Loading…", Rf.MintSoft, Rf.Secondary, Rf.Secondary),
             HealthTileSpec(Lucide.DoorOpen, "", "— Rooms", "Loading…", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High),
-            HealthTileSpec(Lucide.CalendarClock, "", "— Leases", "Loading…", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High)
+            HealthTileSpec(Lucide.Users, "", "— With space", "Loading…", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High)
         )
     }
     val properties = portfolio.properties
     val cities = properties.map { it.city }.filter(String::isNotBlank).distinct()
-    val leased = portfolio.tenants.count { it.lease != null }
-    val noRoom = portfolio.tenants.size - leased
+    val housed = portfolio.tenants.count { it.roomId != null }
+    val noRoom = portfolio.tenants.size - housed
     val vacant = portfolio.allRooms.count { portfolio.occupants(it.id).isEmpty() }
-    // Leases that end within the next two months, soonest first
-    val today = LocalDate.now()
-    val ending = portfolio.tenants
-        .mapNotNull { t -> t.lease?.let { lease -> apiDate(lease.endDate)?.let { end -> Triple(t, lease, end) } } }
-        .filter { (_, _, end) -> !end.isBefore(today) && end.isBefore(today.plusMonths(2)) }
-        .sortedBy { it.third }
-    val next = ending.firstOrNull()
+    // Rooms that can take another tenant: empty ones, and double/triple/shared rooms not yet full
+    val withSpace = portfolio.allRooms.count { it.isAvailable }
+    val partlyFilled = portfolio.allRooms.count { it.isAvailable && portfolio.occupants(it.id).isNotEmpty() }
 
     return listOf(
         HealthTileSpec(
@@ -232,17 +225,19 @@ private fun portfolioTiles(portfolio: Portfolio?): List<HealthTileSpec> {
         ),
         HealthTileSpec(
             Lucide.Users, if (noRoom > 0) "$noRoom no room" else "All housed", "${portfolio.tenants.size} Tenants",
-            "$leased with a lease", Rf.MintSoft, Rf.Secondary, if (noRoom > 0) Rf.OnSurfaceVariant else Rf.Secondary
+            "$housed in a room", Rf.MintSoft, Rf.Secondary, if (noRoom > 0) Rf.OnSurfaceVariant else Rf.Secondary
         ),
         HealthTileSpec(
             Lucide.DoorOpen, "Vacant", "$vacant ${if (vacant == 1) "Room" else "Rooms"}",
             if (vacant == 0) "Every room is let" else "Ready to let", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High
         ),
         HealthTileSpec(
-            Lucide.CalendarClock, next?.third?.monthLabel() ?: "Next 60 days",
-            if (ending.isEmpty()) "No leases ending" else "${ending.size} Lease ending",
-            next?.second?.let { lease -> listOfNotNull(lease.property?.propertyName, lease.room?.roomNumber?.let { "Room $it" }).joinToString(" • ") }
-                ?: "Nothing to renew soon",
+            Lucide.Users, "Space", "$withSpace With space",
+            when {
+                withSpace == 0 -> "Every room is full"
+                partlyFilled > 0 -> "$partlyFilled partly filled"
+                else -> "Rooms that take a tenant"
+            },
             Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High
         )
     )

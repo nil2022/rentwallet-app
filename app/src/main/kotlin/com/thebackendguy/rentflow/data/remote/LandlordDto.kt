@@ -46,47 +46,26 @@ data class RoomDto(
     val images: List<ImageDto> = emptyList()
 )
 
-/** The room and property a lease points at, as the API embeds them. */
+/** The room a tenant lives in, as the API embeds it. */
 @Serializable
-data class LeaseRoomDto(
+data class TenantRoomDto(
     @SerialName("_id") val id: String = "",
     val roomNumber: String = "",
     @Serializable(with = LenientInt::class) val floor: Int = 0,
-    val occupancyType: String? = null
+    val occupancyType: String? = null,
+    val roomSize: String? = null
 )
 
+/** The property of that room. */
 @Serializable
-data class LeasePropertyDto(
+data class TenantPropertyDto(
     @SerialName("_id") val id: String = "",
     val propertyName: String = "",
     val address: String? = null,
     val city: String? = null
 )
 
-@Serializable
-data class LeaseDto(
-    @SerialName("_id") val id: String = "",
-    val propertyId: String = "",
-    val roomId: String = "",
-    val tenantId: String = "",
-    @Serializable(with = LenientDouble::class) val rent: Double = 0.0,
-    @Serializable(with = LenientDouble::class) val securityDeposit: Double = 0.0,
-    @Serializable(with = LenientDouble::class) val maintenanceCharge: Double = 0.0,
-    val startDate: String? = null,
-    val endDate: String? = null,
-    @Serializable(with = LenientInt::class) val tenureMonths: Int = 0,
-    @Serializable(with = LenientInt::class) val rentDueDay: Int = 5,
-    @Serializable(with = LenientDouble::class) val escalationPercent: Double = 0.0,
-    @Serializable(with = LenientInt::class) val lockInMonths: Int = 0,
-    @Serializable(with = LenientInt::class) val noticePeriodMonths: Int = 0,
-    @Serializable(with = LenientDouble::class) val meterStartReading: Double? = null,
-    @Serializable(with = LenientDouble::class) val meterRatePerUnit: Double = 0.0,
-    val status: String = "active",
-    val room: LeaseRoomDto? = null,
-    val property: LeasePropertyDto? = null
-)
-
-/** A tenant account with its active lease, if any. */
+/** A tenant account with the room they live in, or null ids when they have none. */
 @Serializable
 data class TenantDto(
     @SerialName("_id") val id: String = "",
@@ -96,7 +75,10 @@ data class TenantDto(
     val profilePic: String? = null,
     val isActive: Boolean = true,
     val createdAt: String? = null,
-    val lease: LeaseDto? = null
+    val roomId: String? = null,
+    val propertyId: String? = null,
+    val room: TenantRoomDto? = null,
+    val property: TenantPropertyDto? = null
 )
 
 @Serializable
@@ -160,26 +142,6 @@ data class TenantUpdateBody(
     val isActive: Boolean,
     val profilePic: String?
 )
-
-@Serializable
-data class LeaseBody(
-    val roomId: String,
-    val tenantId: String,
-    val rent: Double,
-    val securityDeposit: Double,
-    val maintenanceCharge: Double,
-    val startDate: String,
-    val tenureMonths: Int,
-    val rentDueDay: Int,
-    val escalationPercent: Double,
-    val lockInMonths: Int,
-    val noticePeriodMonths: Int,
-    val meterStartReading: Double?,
-    val meterRatePerUnit: Double?
-)
-
-@Serializable
-data class LeaseStatusBody(val status: String)
 
 @Serializable
 data class ProfileBody(val userId: String, val fullName: String, val mobile: String, val profilePic: String?)

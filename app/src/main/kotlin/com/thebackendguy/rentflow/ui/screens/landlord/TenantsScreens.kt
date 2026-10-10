@@ -47,6 +47,7 @@ import com.thebackendguy.rentflow.data.isValidMobile
 import com.thebackendguy.rentflow.data.mobileDigits
 import com.thebackendguy.rentflow.data.mobileLabel
 import com.thebackendguy.rentflow.data.monthLabel
+import com.thebackendguy.rentflow.data.occupancyLabel
 import com.thebackendguy.rentflow.data.remote.TenantDto
 import com.thebackendguy.rentflow.data.shortLabel
 import com.thebackendguy.rentflow.ui.components.ActionButton
@@ -99,16 +100,15 @@ internal data class DemoRent(val paid: Boolean, val label: String, val lastPayme
 
 private val DayMonth = DateTimeFormatter.ofPattern("dd MMM", Locale.ENGLISH)
 
-internal fun demoRent(tenant: TenantDto): DemoRent {
-    val lease = tenant.lease
+internal fun demoRent(tenant: TenantDto, rent: Double): DemoRent {
     val today = LocalDate.now()
-    val due = today.withDayOfMonth((lease?.rentDueDay ?: 5).coerceIn(1, 28))
+    val due = today.withDayOfMonth(5)
     val paid = tenant.id.hashCode().absoluteValue % 3 != 0
     val paidOn = due.minusDays((tenant.id.hashCode().absoluteValue % 4 + 1).toLong())
     return DemoRent(
         paid = paid,
         label = if (paid) "Paid ${paidOn.format(DayMonth)}" else "Due ${due.format(DayMonth)}",
-        lastPayment = "${inr(lease?.rent ?: 0.0)} on ${(if (paid) paidOn else paidOn.minusMonths(1)).shortLabel()}"
+        lastPayment = "${inr(rent)} on ${(if (paid) paidOn else paidOn.minusMonths(1)).shortLabel()}"
     )
 }
 
@@ -149,13 +149,15 @@ fun TenantsScreen(shell: Shell, onOpenTenant: (String) -> Unit, onAddTenant: () 
                     AlertCard(Lucide.Banknote, "Withdrawal processing", "Bank transfer of ₹15,000 is on its way.", Rf.AmberSoft, Rf.Amber)
                 }
 
-                val leased = tenants.filter { it.lease != null }
-                val paid = leased.count { demoRent(it).paid }
-                val noRoom = tenants.size - leased.size
+                // Rent is set on the room
+                val rentOf = { t: TenantDto -> portfolio.room(t.roomId)?.rent ?: 0.0 }
+                val housed = tenants.filter { it.roomId != null }
+                val paid = housed.count { demoRent(it, rentOf(it)).paid }
+                val noRoom = tenants.size - housed.size
                 Column {
                     SectionHead("All tenants") { Caption("${LocalDate.now().monthLabel().substringBefore(' ')} rent") }
                     Segmented(
-                        options = listOf("All (${tenants.size})", "Paid ($paid)", "Due (${leased.size - paid})", "No room ($noRoom)"),
+                        options = listOf("All (${tenants.size})", "Paid ($paid)", "Due (${housed.size - paid})", "No room ($noRoom)"),
                         selected = filter,
                         onSelect = { filter = it },
                         modifier = Modifier.padding(top = 12.dp)
@@ -163,12 +165,12 @@ fun TenantsScreen(shell: Shell, onOpenTenant: (String) -> Unit, onAddTenant: () 
                     val q = query.trim()
                     val shown = tenants.filter { t ->
                         val matchesFilter = when (filter) {
-                            1 -> t.lease != null && demoRent(t).paid
-                            2 -> t.lease != null && !demoRent(t).paid
-                            3 -> t.lease == null
+                            1 -> t.roomId != null && demoRent(t, rentOf(t)).paid
+                            2 -> t.roomId != null && !demoRent(t, rentOf(t)).paid
+                            3 -> t.roomId == null
                             else -> true
                         }
-                        matchesFilter && (q.isEmpty() || listOfNotNull(t.fullName, t.email, t.mobile, t.lease?.property?.propertyName)
+                        matchesFilter && (q.isEmpty() || listOfNotNull(t.fullName, t.email, t.mobile, t.property?.propertyName, t.room?.roomNumber)
                             .any { it.contains(q, ignoreCase = true) })
                     }
                     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -176,7 +178,7 @@ fun TenantsScreen(shell: Shell, onOpenTenant: (String) -> Unit, onAddTenant: () 
                             Text("No tenants to show here.", style = RfType.BodyMd, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(4.dp))
                         }
                         shown.forEach { tenant ->
-                            TenantCard(tenant, onOpen = { onOpenTenant(tenant.id) }, onAssign = { onAssignRoom(tenant.id) })
+                            TenantCard(tenant, rentOf(tenant), onOpen = { onOpenTenant(tenant.id) }, onAssign = { onAssignRoom(tenant.id) })
                         }
                     }
                 }
@@ -188,11 +190,10 @@ fun TenantsScreen(shell: Shell, onOpenTenant: (String) -> Unit, onAddTenant: () 
 }
 
 @Composable
-private fun TenantCard(tenant: TenantDto, onOpen: () -> Unit, onAssign: () -> Unit) {
-    val lease = tenant.lease
+private fun TenantCard(tenant: TenantDto, rentAmount: Double, onOpen: () -> Unit, onAssign: () -> Unit) {
     val phone = mobileLabel(tenant.mobile) ?: tenant.email
     RfCard(padding = PaddingValues(14.dp), spacing = 10.dp, onClick = onOpen) {
-        if (lease == null) {
+        if (tenant.roomId == null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PersonAvatar(tenant.fullName, tenant.profilePic, size = 40.dp, background = Rf.Low, content = Rf.OnSurfaceVariant)
@@ -220,7 +221,7 @@ private fun TenantCard(tenant: TenantDto, onOpen: () -> Unit, onAssign: () -> Un
             return@RfCard
         }
 
-        val rent = demoRent(tenant)
+        val rent = demoRent(tenant, rentAmount)
         val tint = if (rent.paid) Rf.Secondary else Rf.Error
         val soft = if (rent.paid) Rf.MintSoft else Rf.ErrorContainer
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -229,7 +230,7 @@ private fun TenantCard(tenant: TenantDto, onOpen: () -> Unit, onAssign: () -> Un
                 Column {
                     Text(tenant.fullName, style = RfType.BodyLg.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOfNotNull(lease.property?.propertyName, lease.room?.roomNumber?.let { "Room $it" }).joinToString(" • "),
+                        listOfNotNull(tenant.property?.propertyName, tenant.room?.roomNumber?.let { "Room $it" }).joinToString(" • "),
                         style = RfType.LabelSm, color = Rf.OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -243,7 +244,7 @@ private fun TenantCard(tenant: TenantDto, onOpen: () -> Unit, onAssign: () -> Un
         ) {
             Column {
                 Text("Monthly rent", style = RfType.LabelSm, color = Rf.Outline)
-                Text(inr(lease.rent), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface)
+                Text(inr(rentAmount), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface)
             }
             Text(rent.label, style = RfType.LabelMd, color = tint)
         }
@@ -276,17 +277,20 @@ fun TenantDetailsScreen(
     val tenant = state.data?.tenant(tenantId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var confirmEnd by remember { mutableStateOf(false) }
+    var confirmRemove by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
     AppPage(topBar = { shell.TopBar(tenant?.fullName ?: "Tenant", onBack = onBack) }, bottomBar = { shell.BottomNav(2) }) {
-        PortfolioContent(state) {
+        PortfolioContent(state) { portfolio ->
             if (tenant == null) {
                 NotFound("Tenant", onBack)
                 return@PortfolioContent
             }
-            val lease = tenant.lease
+            val roomId = tenant.roomId
+            // Rent and deposit are set on the room
+            val room = portfolio.room(roomId)
+            val roomName = tenant.room?.roomNumber ?: room?.roomNumber
             val since = apiDate(tenant.createdAt)?.monthLabel()
 
             RfCard {
@@ -317,18 +321,21 @@ fun TenantDetailsScreen(
                 ActionButton("Edit", Lucide.Pencil, Rf.Container, Rf.Primary, Modifier.weight(1f), onClick = onEdit)
             }
 
-            if (lease != null) {
+            if (roomId != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionHead("Lease") { Pill("Active", background = Rf.MintSoft, content = Rf.Secondary) }
+                    SectionHead("Room") { Pill("Active", background = Rf.MintSoft, content = Rf.Secondary) }
                     RfCard {
                         DetailRows(
                             listOfNotNull(
-                                lease.property?.let { Detail("Property", it.propertyName) },
-                                lease.room?.let { Detail("Room", "${it.roomNumber} • ${floorLabel(it.floor)}") }
-                            ) + leaseRows(lease)
+                                tenant.property?.let { Detail("Property", it.propertyName) },
+                                roomName?.let { Detail("Room", listOfNotNull(it, (tenant.room?.floor ?: room?.floor)?.let(::floorLabel)).joinToString(" • ")) },
+                                (tenant.room?.occupancyType ?: room?.occupancyType)?.let { Detail("Occupancy", occupancyLabel(it)) },
+                                room?.let { Detail("Monthly rent", inr(it.rent)) },
+                                room?.let { Detail("Security deposit", inr(it.securityDeposit)) }
+                            )
                         )
                         Row(
-                            Modifier.padding(top = 14.dp).pressable({ onOpenRoom(lease.roomId) }),
+                            Modifier.padding(top = 14.dp).pressable({ onOpenRoom(roomId) }),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -338,8 +345,8 @@ fun TenantDetailsScreen(
                     }
                 }
 
-                // Sample data until the payments API exists
-                val rent = demoRent(tenant)
+                // Sample data until the payments screens are built
+                val rent = demoRent(tenant, room?.rent ?: 0.0)
                 TitledCard("Rent status", caption = LocalDate.now().monthLabel()) {
                     IconRows(
                         listOf(
@@ -350,13 +357,16 @@ fun TenantDetailsScreen(
                     )
                 }
                 ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Rf.OnSecondary, Modifier.fillMaxWidth(), doneLabel = "Reminder sent")
-                ActionButton("End lease", Lucide.LogOut, Rf.ErrorContainer, Rf.Error, Modifier.fillMaxWidth()) { confirmEnd = true }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActionButton("Change room", Lucide.DoorOpen, Rf.Container, Rf.Primary, Modifier.weight(1f), onClick = onAssignRoom)
+                    ActionButton("Remove from room", Lucide.LogOut, Rf.ErrorContainer, Rf.Error, Modifier.weight(1f)) { confirmRemove = true }
+                }
             } else {
                 RfCard {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         IconTile(Lucide.DoorOpen, background = Rf.PrimaryFixed, tint = Rf.Primary, size = 48.dp, radius = 14.dp, iconSize = 24.dp)
                         Text("Not in a room yet", style = RfType.BodyLg.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                        Text("Assign a vacant room to start their lease.", style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center)
+                        Text("Give them a room with space. They pay the rent set on it.", style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center)
                     }
                     PrimaryButton("Assign a room", onClick = onAssignRoom, showArrow = false, modifier = Modifier.padding(top = 16.dp))
                 }
@@ -368,43 +378,40 @@ fun TenantDetailsScreen(
                 modifier = Modifier.fillMaxWidth().pressable({ confirmDelete = true }).padding(vertical = 6.dp)
             )
 
-            if (confirmEnd && lease != null) {
+            if (confirmRemove && roomId != null) {
+                val where = roomName?.let { "Room $it" } ?: "their room"
                 ConfirmSheet(
                     icon = Lucide.LogOut,
-                    title = "End ${tenant.fullName}’s lease?",
-                    message = "Room ${lease.room?.roomNumber.orEmpty()} becomes free for another tenant. ${tenant.fullName}’s account and the lease record are kept.",
-                    confirmLabel = "End lease",
+                    title = "Remove ${tenant.fullName} from $where?",
+                    message = "The room gets their place back. ${tenant.fullName}’s account and bills are kept, and you can give them a room again later.",
+                    confirmLabel = "Remove from room",
                     busy = busy,
                     onConfirm = {
                         busy = true
                         scope.launch {
-                            LandlordStore.endLease(lease.id).announce("Lease ended")
+                            LandlordStore.assignRoom(tenant.id, null).announce("${tenant.fullName} removed from $where")
                             busy = false
-                            confirmEnd = false
+                            confirmRemove = false
                         }
                     },
-                    onDismiss = { confirmEnd = false }
+                    onDismiss = { confirmRemove = false }
                 )
             }
             if (confirmDelete) {
                 ConfirmSheet(
                     icon = Lucide.Trash2,
                     title = "Delete ${tenant.fullName}?",
-                    message = if (lease != null) "${tenant.fullName} still has an active lease. End it first, then delete the tenant."
-                    else "Their account is removed and they can no longer sign in. This can’t be undone.",
-                    confirmLabel = if (lease != null) "OK" else "Delete tenant",
+                    message = "Their account is removed and they can no longer sign in." +
+                        (if (roomName != null) " Room $roomName gets their place back." else "") + " This can’t be undone.",
+                    confirmLabel = "Delete tenant",
                     busy = busy,
                     onConfirm = {
-                        if (lease != null) {
+                        busy = true
+                        scope.launch {
+                            val done = LandlordStore.deleteTenant(tenant.id).announce("Tenant deleted")
+                            busy = false
                             confirmDelete = false
-                        } else {
-                            busy = true
-                            scope.launch {
-                                val done = LandlordStore.deleteTenant(tenant.id).announce("Tenant deleted")
-                                busy = false
-                                confirmDelete = false
-                                if (done) onDeleted()
-                            }
+                            if (done) onDeleted()
                         }
                     },
                     onDismiss = { confirmDelete = false }

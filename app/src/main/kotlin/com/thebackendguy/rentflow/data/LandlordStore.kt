@@ -4,8 +4,6 @@ import android.content.Context
 import android.net.Uri
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.ChangePasswordBody
-import com.thebackendguy.rentflow.data.remote.LeaseBody
-import com.thebackendguy.rentflow.data.remote.LeaseStatusBody
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.remote.NewTenantBody
 import com.thebackendguy.rentflow.data.remote.ProfileBody
@@ -32,6 +30,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /** Data a screen shows, with whether a reload is running and why the last one failed. */
 data class Loadable<out T>(val data: T? = null, val loading: Boolean = false, val error: String? = null)
@@ -49,13 +50,13 @@ data class Portfolio(
     val tenants: List<TenantDto>
 ) {
     val allRooms: List<RoomDto> = rooms.values.flatten()
-    val tenantsWithoutRoom: List<TenantDto> get() = tenants.filter { it.lease == null }
+    val tenantsWithoutRoom: List<TenantDto> get() = tenants.filter { it.roomId == null }
 
     fun property(id: String?) = properties.find { it.id == id }
     fun room(id: String?) = allRooms.find { it.id == id }
     fun tenant(id: String?) = tenants.find { it.id == id }
     fun roomsOf(propertyId: String) = rooms[propertyId].orEmpty().sortedWith(compareBy({ it.floor }, { it.roomNumber }))
-    fun occupants(roomId: String) = tenants.filter { it.lease?.roomId == roomId }
+    fun occupants(roomId: String) = tenants.filter { it.roomId == roomId }
 }
 
 /**
@@ -168,7 +169,7 @@ object LandlordStore {
 
     suspend fun deleteRoom(id: String): ApiResult<Unit> = change { apiCall { api.deleteRoom(id) }.discard() }
 
-    /* ------------------------------ Tenants and leases ------------------------------ */
+    /* ------------------------------ Tenants and their rooms ------------------------------ */
 
     /** Creates the tenant account and returns its id. The list reloads with [assignRoom] or [finish]. */
     suspend fun addTenant(context: Context, body: NewTenantBody, photo: Uri?): ApiResult<String> {
@@ -209,10 +210,14 @@ object LandlordStore {
 
     suspend fun deleteTenant(id: String): ApiResult<Unit> = change { apiCall { api.deleteTenant(id) }.discard() }
 
-    suspend fun assignRoom(body: LeaseBody): ApiResult<Unit> = change { apiCall { api.createLease(body) }.discard() }
-
-    suspend fun endLease(leaseId: String): ApiResult<Unit> =
-        change { apiCall { api.updateLeaseStatus(leaseId, LeaseStatusBody("ended")) }.discard() }
+    /** Puts the tenant in [roomId], moving them from any other room; null takes them out of their room. */
+    suspend fun assignRoom(tenantId: String, roomId: String?): ApiResult<Unit> = change {
+        val body = buildJsonObject {
+            put("tenantId", JsonPrimitive(tenantId))
+            put("roomId", if (roomId == null) JsonNull else JsonPrimitive(roomId))
+        }
+        apiCall { api.assignRoom(body) }.discard()
+    }
 
     /** Reloads after a flow that saved something but stopped part-way. */
     suspend fun finish() = reload()

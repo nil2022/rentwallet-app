@@ -19,6 +19,21 @@ fun propertyTypeLabel(type: String) = PropertyTypes.find { it.first == type }?.s
 fun occupancyLabel(type: String?) = OccupancyTypes.find { it.first == type }?.second
     ?: type?.replaceFirstChar { it.uppercase() }.orEmpty()
 
+/** How many tenants a room takes, as the API counts it; null for a shared room (no fixed limit). */
+fun roomCapacity(type: String?): Int? = when (type) {
+    "double" -> 2
+    "triple" -> 3
+    "shared" -> null
+    else -> 1
+}
+
+/** "1 of 2 tenants", or "3 tenants" in a shared room. */
+fun occupancyCount(type: String?, tenants: Int): String {
+    val capacity = roomCapacity(type)
+    val noun = if ((capacity ?: tenants) == 1) "tenant" else "tenants"
+    return if (capacity == null) "$tenants $noun" else "$tenants of $capacity $noun"
+}
+
 /** "Ground Floor", "1st Floor", "12th Floor". */
 fun floorLabel(floor: Int): String = if (floor == 0) "Ground Floor" else "${ordinal(floor)} Floor"
 
@@ -34,8 +49,6 @@ fun ordinal(n: Int): String {
     }
     return "$n$suffix"
 }
-
-fun dueDayLabel(day: Int) = "${ordinal(day)} of every month"
 
 fun inr(amount: Double): String = inr(amount.roundToInt())
 
@@ -53,12 +66,6 @@ fun apiDate(value: String?): LocalDate? = value?.let {
 
 fun LocalDate.shortLabel(): String = format(ShortDate)
 fun LocalDate.monthLabel(): String = format(MonthYear)
-
-/** The date the API expects for a lease start. */
-fun LocalDate.apiDay(): String = toString()
-
-/** Last day of a lease that starts on [start] and runs [months] months, as the API works it out. */
-fun leaseEnd(start: LocalDate, months: Int): LocalDate = start.plusMonths(months.toLong()).minusDays(1)
 
 /** "+91 98765 43210" for a 10-digit Indian mobile, otherwise as stored. */
 fun mobileLabel(mobile: String?): String? =
