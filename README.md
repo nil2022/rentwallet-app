@@ -50,7 +50,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 09 Overview | 10 Tenants | 11 Tenant Details | 12 Profile |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/09-landlord-overview.png" width="170" alt="Landlord overview"> | <img src="docs/screenshots/10-tenants.png" width="170" alt="Tenants"> | <img src="docs/screenshots/11-tenant-details.png" width="170" alt="Tenant details"> | <img src="docs/screenshots/12-landlord-profile.png" width="170" alt="Landlord profile"> |
-| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | Contact details, their room with its rent and deposit. Call, edit, change room, remove from the room or delete the tenant. | Real owner details and counts. Edit profile and change password. |
+| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | The web’s tenant page (screenshot is the older design, [new mockup](https://claude.ai/artifact/ABML2dsqaiv3pPLiEQ6LpC)): photo, Active, since, mobile and email; the assigned unit and a payment status from the bills (overdue, due, advance, paid or not billed); Record Payment and Edit. Then Room & Tenancy, Roommates, Payment History, Contact & Account (Call, WhatsApp, email, how they sign in) and Tenancy Actions (change room, remove from room, delete). | Real owner details and counts. Edit profile and change password. |
 
 ### Properties and rooms
 
@@ -160,6 +160,8 @@ flowchart TD
         LO -->|"Add tenant"| AT
         TD -->|"Edit"| TF["22 Edit Tenant"]
         TD -->|"Assign or change room"| AT
+        TD -->|"View property"| PD
+        TD -->|"Record Payment / Collect"| RP
         LP -->|"Edit"| EP["24 Edit Profile"]
         LP -->|"Change password"| CP["25 Change Password"]
     end

@@ -455,7 +455,8 @@ private fun RentFlowApp() {
                             onBack = ::back,
                             onEdit = { go(Screen.TenantForm, a) },
                             onAssignRoom = { go(Screen.AddTenant, a) },
-                            onOpenRoom = { go(Screen.RoomDetails, it) },
+                            onOpenProperty = { go(Screen.PropertyDetails, it) },
+                            onOpenTenant = { go(Screen.TenantDetails, it) },
                             onRecordPayment = { month -> go(Screen.RecordPayment, a, month) },
                             onEditBill = { billId -> go(Screen.RecordPayment, a, "$EDIT_BILL$billId") },
                             onDeleted = ::back

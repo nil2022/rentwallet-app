@@ -1,6 +1,5 @@
 package com.thebackendguy.rentflow.ui.screens.landlord
 
-import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,40 +33,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.thebackendguy.rentflow.data.LandlordStore
 import com.thebackendguy.rentflow.data.Photo
-import com.thebackendguy.rentflow.data.apiDate
-import com.thebackendguy.rentflow.data.floorLabel
 import com.thebackendguy.rentflow.data.inr
 import com.thebackendguy.rentflow.data.isValidMobile
 import com.thebackendguy.rentflow.data.mobileDigits
 import com.thebackendguy.rentflow.data.mobileLabel
 import com.thebackendguy.rentflow.data.monthLabel
-import com.thebackendguy.rentflow.data.occupancyLabel
 import com.thebackendguy.rentflow.data.remote.TenantDto
 import com.thebackendguy.rentflow.data.shortLabel
-import com.thebackendguy.rentflow.ui.components.ActionButton
 import com.thebackendguy.rentflow.ui.components.AlertCard
 import com.thebackendguy.rentflow.ui.components.AppPage
 import com.thebackendguy.rentflow.ui.components.Caption
-import com.thebackendguy.rentflow.ui.components.ConfirmSheet
-import com.thebackendguy.rentflow.ui.components.Detail
-import com.thebackendguy.rentflow.ui.components.DetailRows
 import com.thebackendguy.rentflow.ui.components.EmptyState
 import com.thebackendguy.rentflow.ui.components.Fab
 import com.thebackendguy.rentflow.ui.components.FormBar
 import com.thebackendguy.rentflow.ui.components.FormSection
-import com.thebackendguy.rentflow.ui.components.IconDetail
-import com.thebackendguy.rentflow.ui.components.IconRows
-import com.thebackendguy.rentflow.ui.components.IconTile
 import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.PhotoViewer
 import com.thebackendguy.rentflow.ui.components.Pill
-import com.thebackendguy.rentflow.ui.components.PrimaryButton
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.SectionHead
@@ -256,160 +243,6 @@ private fun TenantCard(tenant: TenantDto, rentAmount: Double, onOpen: () -> Unit
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("View details", style = RfType.LabelSm, color = Rf.Primary)
                 LIcon(Lucide.ChevronRight, size = 14.dp, tint = Rf.Primary)
-            }
-        }
-    }
-}
-
-/* ------------------------------ Tenant details ------------------------------ */
-
-@Composable
-fun TenantDetailsScreen(
-    tenantId: String,
-    shell: Shell,
-    onBack: () -> Unit,
-    onEdit: () -> Unit,
-    onAssignRoom: () -> Unit,
-    onOpenRoom: (String) -> Unit,
-    onRecordPayment: (month: String?) -> Unit,
-    onEditBill: (billId: String) -> Unit,
-    onDeleted: () -> Unit
-) {
-    val state = portfolioState()
-    val tenant = state.data?.tenant(tenantId)
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var confirmRemove by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-
-    AppPage(topBar = { shell.TopBar(tenant?.fullName ?: "Tenant", onBack = onBack) }, bottomBar = { shell.BottomNav(3) }) {
-        PortfolioContent(state) { portfolio ->
-            if (tenant == null) {
-                NotFound("Tenant", onBack)
-                return@PortfolioContent
-            }
-            val roomId = tenant.roomId
-            // Rent and deposit are set on the room
-            val room = portfolio.room(roomId)
-            val roomName = tenant.room?.roomNumber ?: room?.roomNumber
-            val since = apiDate(tenant.createdAt)?.monthLabel()
-
-            RfCard {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    PersonAvatar(tenant.fullName, tenant.profilePic, size = 56.dp)
-                    Column(Modifier.weight(1f)) {
-                        Text(tenant.fullName, style = RfType.HeadlineSm, color = Rf.OnSurface)
-                        Text(if (since != null) "Tenant since $since" else "Tenant", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
-                    }
-                    if (tenant.isActive) Pill("Active", background = Rf.MintSoft, content = Rf.Secondary)
-                    else Pill("Inactive", background = Rf.Low, content = Rf.OnSurfaceVariant)
-                }
-                Box(Modifier.padding(top = 14.dp)) {
-                    IconRows(
-                        listOf(
-                            IconDetail(Lucide.Phone, "Mobile", mobileLabel(tenant.mobile) ?: "Not added"),
-                            IconDetail(Lucide.Mail, "Email", tenant.email.ifBlank { "Not added" })
-                        )
-                    )
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActionButton("Call", Lucide.Phone, Rf.Container, Rf.Primary, Modifier.weight(1f)) {
-                    val number = mobileDigits(tenant.mobile)
-                    if (number.isNotEmpty()) context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+91$number")))
-                }
-                ActionButton("Edit", Lucide.Pencil, Rf.Container, Rf.Primary, Modifier.weight(1f), onClick = onEdit)
-            }
-
-            if (roomId != null) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionHead("Room") { Pill("Active", background = Rf.MintSoft, content = Rf.Secondary) }
-                    RfCard {
-                        DetailRows(
-                            listOfNotNull(
-                                tenant.property?.let { Detail("Property", it.propertyName) },
-                                roomName?.let { Detail("Room", listOfNotNull(it, (tenant.room?.floor ?: room?.floor)?.let(::floorLabel)).joinToString(" • ")) },
-                                (tenant.room?.occupancyType ?: room?.occupancyType)?.let { Detail("Occupancy", occupancyLabel(it)) },
-                                room?.let { Detail("Monthly rent", inr(it.rent)) },
-                                room?.let { Detail("Security deposit", inr(it.securityDeposit)) }
-                            )
-                        )
-                        Row(
-                            Modifier.padding(top = 14.dp).pressable({ onOpenRoom(roomId) }),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("Open room", style = RfType.LabelMd, color = Rf.Primary)
-                            LIcon(Lucide.ArrowRight, size = 14.dp, tint = Rf.Primary)
-                        }
-                    }
-                }
-
-                ActionButton("Send reminder", Lucide.Send, Rf.Secondary, Rf.OnSecondary, Modifier.fillMaxWidth(), doneLabel = "Reminder sent")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ActionButton("Change room", Lucide.DoorOpen, Rf.Container, Rf.Primary, Modifier.weight(1f), onClick = onAssignRoom)
-                    ActionButton("Remove from room", Lucide.LogOut, Rf.ErrorContainer, Rf.Error, Modifier.weight(1f)) { confirmRemove = true }
-                }
-            } else {
-                RfCard {
-                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconTile(Lucide.DoorOpen, background = Rf.PrimaryFixed, tint = Rf.Primary, size = 48.dp, radius = 14.dp, iconSize = 24.dp)
-                        Text("Not in a room yet", style = RfType.BodyLg.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                        Text("Give them a room with space. They pay the rent set on it.", style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center)
-                    }
-                    PrimaryButton("Assign a room", onClick = onAssignRoom, showArrow = false, modifier = Modifier.padding(top = 16.dp))
-                }
-            }
-
-            // Every month's bill, from the bills API (the web's Payment History card)
-            PaymentHistoryCard(tenant.id, tenant.fullName, onRecord = onRecordPayment, onEditBill = onEditBill)
-
-            Text(
-                "Delete tenant",
-                style = RfType.LabelMd, color = Rf.Error, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().pressable({ confirmDelete = true }).padding(vertical = 6.dp)
-            )
-
-            if (confirmRemove && roomId != null) {
-                val where = roomName?.let { "Room $it" } ?: "their room"
-                ConfirmSheet(
-                    icon = Lucide.LogOut,
-                    title = "Remove ${tenant.fullName} from $where?",
-                    message = "The room gets their place back. ${tenant.fullName}’s account and bills are kept, and you can give them a room again later.",
-                    confirmLabel = "Remove from room",
-                    busy = busy,
-                    onConfirm = {
-                        busy = true
-                        scope.launch {
-                            LandlordStore.assignRoom(tenant.id, null).announce("${tenant.fullName} removed from $where")
-                            busy = false
-                            confirmRemove = false
-                        }
-                    },
-                    onDismiss = { confirmRemove = false }
-                )
-            }
-            if (confirmDelete) {
-                ConfirmSheet(
-                    icon = Lucide.Trash2,
-                    title = "Delete ${tenant.fullName}?",
-                    message = "Their account is removed and they can no longer sign in." +
-                        (if (roomName != null) " Room $roomName gets their place back." else "") + " This can’t be undone.",
-                    confirmLabel = "Delete tenant",
-                    busy = busy,
-                    onConfirm = {
-                        busy = true
-                        scope.launch {
-                            val done = LandlordStore.deleteTenant(tenant.id).announce("Tenant deleted")
-                            busy = false
-                            confirmDelete = false
-                            if (done) onDeleted()
-                        }
-                    },
-                    onDismiss = { confirmDelete = false }
-                )
             }
         }
     }

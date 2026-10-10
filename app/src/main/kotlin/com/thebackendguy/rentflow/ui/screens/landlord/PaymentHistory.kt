@@ -53,25 +53,40 @@ import java.time.LocalDate
 private const val PAGE = 6
 
 /**
- * The web's Payment History card on a tenant's page: totals, a status filter and
- * every month's bill, newest first. A bill opens its details; Collect and Record
- * Payment open the form ([onRecord] with the bill's month, or null for this month).
+ * A tenant's bills, newest month first, loaded again whenever a bill changes.
+ * Null until they arrive; [Pair.second] is why they couldn't be loaded.
  */
 @Composable
-internal fun PaymentHistoryCard(tenantId: String, tenantName: String, onRecord: (String?) -> Unit, onEditBill: (String) -> Unit) {
-    val context = LocalContext.current
+internal fun rememberTenantBills(tenantId: String): Pair<List<BillDto>?, String?> {
     val version by PaymentStore.version.collectAsState()
-    var bills by remember { mutableStateOf<List<BillDto>?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var filter by rememberSaveable { mutableStateOf("all") }
-    var shown by rememberSaveable { mutableIntStateOf(PAGE) }
-    var openId by rememberSaveable { mutableStateOf<String?>(null) }
+    var bills by remember(tenantId) { mutableStateOf<List<BillDto>?>(null) }
+    var error by remember(tenantId) { mutableStateOf<String?>(null) }
     LaunchedEffect(tenantId, version) {
         when (val r = PaymentStore.bills(tenantId = tenantId)) {
             is ApiResult.Ok -> { bills = r.value.sortedByDescending { it.monthYear }; error = null }
             is ApiResult.Fail -> error = r.message
         }
     }
+    return bills to error
+}
+
+/**
+ * The web's Payment History card on a tenant's page: totals, a status filter and
+ * every month's bill, newest first. A bill opens its details; Collect and Record
+ * Payment open the form ([onRecord] with the bill's month, or null for this month).
+ */
+@Composable
+internal fun PaymentHistoryCard(
+    bills: List<BillDto>?,
+    error: String?,
+    tenantName: String,
+    onRecord: (String?) -> Unit,
+    onEditBill: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var filter by rememberSaveable { mutableStateOf("all") }
+    var shown by rememberSaveable { mutableIntStateOf(PAGE) }
+    var openId by rememberSaveable { mutableStateOf<String?>(null) }
 
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
