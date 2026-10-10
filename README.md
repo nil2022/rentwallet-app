@@ -9,7 +9,7 @@
   Built with Kotlin and Jetpack Compose, and designed to match the RentFlow web app’s phone layout.
 </p>
 
-> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. So do the tenants’ payment statuses on the Tenants tab and every figure on Overview. The money figures on Profile, the wallet, and the tenant’s rent screens still show **sample numbers** (see [What’s next](#whats-next)).
+> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. So do the tenants’ payment statuses on the Tenants tab and every figure on Overview and Profile. The wallet and the tenant’s rent screens still show **sample numbers** (see [What’s next](#whats-next)).
 
 ## Contents
 
@@ -50,7 +50,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 09 Overview | 10 Tenants | 11 Tenant Details | 12 Profile |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/09-landlord-overview.png" width="170" alt="Landlord overview"> | <img src="docs/screenshots/10-tenants.png" width="170" alt="Tenants"> | <img src="docs/screenshots/11-tenant-details.png" width="170" alt="Tenant details"> | <img src="docs/screenshots/12-landlord-profile.png" width="170" alt="Landlord profile"> |
-| The web’s phone dashboard (screenshot is the older design, [new mockup](https://claude.ai/artifact/LFReFdJCABQkYVgDePCrz4)): Portfolio Health (estates and cities, rooms “% full” and with space, overdue from earlier months, which opens those bills, and this month’s collected of billed with advance held); Record Payment, Rent Collection and Overdue; Rent this month (this month’s bills and the overdue ones, six at a time, All / Paid / Unpaid, Collect on unpaid ones); five property cards with “+ Add” and View All; and Electricity this month once a bill has a meter reading. | The web’s Tenant Directory (screenshot is the older design, [new mockup](https://claude.ai/artifact/RaTkLr6Mz9Z5k1pTrTXDQa)): search by name, mobile, email or room, and a Filters sheet for property and rent status (Overdue, Due, Paid, Not billed) with counts; filters that are on show as chips with “Clear all”. Each card: photo with a dot (green in a room, amber no room, red overdue), contacts, room and property, monthly rent, this month’s payment status from the bills, room type and date added, then View, Edit and Delete. ⋮ assigns, moves or removes the room, or calls the tenant. Every tenant is in one scroll. | The web’s tenant page (screenshot is the older design, [new mockup](https://claude.ai/artifact/ABML2dsqaiv3pPLiEQ6LpC)): photo, Active, since, mobile and email; the assigned unit and a payment status from the bills (overdue, due, advance, paid or not billed); Record Payment and Edit. Then Room & Tenancy, Roommates, Payment History, Contact & Account (Call, WhatsApp, email, how they sign in) and Tenancy Actions (change room, remove from room, delete). | Real owner details and counts. Edit profile and change password. |
+| The web’s phone dashboard (screenshot is the older design, [new mockup](https://claude.ai/artifact/LFReFdJCABQkYVgDePCrz4)): Portfolio Health (estates and cities, rooms “% full” and with space, overdue from earlier months, which opens those bills, and this month’s collected of billed with advance held); Record Payment, Rent Collection and Overdue; Rent this month (this month’s bills and the overdue ones, six at a time, All / Paid / Unpaid, Collect on unpaid ones); five property cards with “+ Add” and View All; and Electricity this month once a bill has a meter reading. | The web’s Tenant Directory (screenshot is the older design, [new mockup](https://claude.ai/artifact/RaTkLr6Mz9Z5k1pTrTXDQa)): search by name, mobile, email or room, and a Filters sheet for property and rent status (Overdue, Due, Paid, Not billed) with counts; filters that are on show as chips with “Clear all”. Each card: photo with a dot (green in a room, amber no room, red overdue), contacts, room and property, monthly rent, this month’s payment status from the bills, room type and date added, then View, Edit and Delete. ⋮ assigns, moves or removes the room, or calls the tenant. Every tenant is in one scroll. | The web’s tenant page (screenshot is the older design, [new mockup](https://claude.ai/artifact/ABML2dsqaiv3pPLiEQ6LpC)): photo, Active, since, mobile and email; the assigned unit and a payment status from the bills (overdue, due, advance, paid or not billed); Record Payment and Edit. Then Room & Tenancy, Roommates, Payment History, Contact & Account (Call, WhatsApp, email, how they sign in) and Tenancy Actions (change room, remove from room, delete). | The web’s profile page (screenshot is the older design, [new mockup](https://claude.ai/artifact/3U6ZSedyM7ccQi5NPfSymb)): photo (tap to view; the camera button changes or removes it), Landlord and email / mobile verified pills, member since and Landlord ID, and Properties, Rooms full, Tenants and this month’s Collected tiles that open their tabs. Name, email and mobile are edited in place with a “You have unsaved changes” bar; a new email becomes your sign-in. Then Security & Login (Change Password, last sign-in), the Account card and Log out. |
 
 ### Properties and rooms
 
@@ -83,10 +83,10 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 
 ### Profile settings
 
-| 24 Edit Profile | 25 Change Password |
-|:---:|:---:|
-| <img src="docs/screenshots/24-edit-profile.png" width="220" alt="Edit profile"> | <img src="docs/screenshots/25-change-password.png" width="220" alt="Change password"> |
-| Photo, name and mobile. The sign-in email is locked. | Current password, then the new one twice, with the password rule. |
+| 25 Change Password |
+|:---:|
+| <img src="docs/screenshots/25-change-password.png" width="220" alt="Change password"> |
+| Current password, then the new one twice. As on the web, the new one needs at least 6 characters, must differ from the current one and match its confirmation; each check turns green as you type. (Screenshot is the older design.) |
 
 ### Confirmations and list states
 
@@ -164,7 +164,6 @@ flowchart TD
         TD -->|"Assign or change room"| AT
         TD -->|"View property"| PD
         TD -->|"Record Payment / Collect"| RP
-        LP -->|"Edit"| EP["24 Edit Profile"]
         LP -->|"Change password"| CP["25 Change Password"]
     end
 
@@ -192,7 +191,7 @@ How navigation works:
 | Record Payment | Everything: new bills, money received, advance, meter photo and payment proof uploads | None |
 | Rent History | Everything: monthly totals from `/landlord/payment/summary`, chart, CSV | None |
 | Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room. This month’s payment status on the list and the tenant page, and the tenant’s Payment History | None |
-| Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
+| Landlord Profile | Everything: details, verified flags, last sign-in, portfolio tiles, collected this month. Edit details and photo, change password | None |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |
 | Tenant Home, Pay Rent, Payments, Receipt | None yet | Everything |
 | Bell and notifications (both roles) | Unread count, the list 20 at a time | None |
@@ -338,7 +337,7 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
 2. ~~**Landlord data:** properties, rooms, tenants and who lives in which room, with add, edit and delete.~~ Done.
 3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
-4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection, Record Payment, bill details, the tenant’s Payment History and Rent History use them; the Tenants tab and Overview use them too; the money on Profile comes next ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
+4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection, Record Payment, bill details, the tenant’s Payment History and Rent History use them; the Tenants tab, Overview and Profile use them too ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
 6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.
 7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.

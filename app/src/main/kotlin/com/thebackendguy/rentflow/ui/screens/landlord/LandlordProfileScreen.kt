@@ -1,18 +1,27 @@
 package com.thebackendguy.rentflow.ui.screens.landlord
 
-import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,213 +31,462 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.thebackendguy.rentflow.data.Demo
+import com.thebackendguy.rentflow.data.AuthRepository
 import com.thebackendguy.rentflow.data.LandlordStore
-import com.thebackendguy.rentflow.data.PayStatus
+import com.thebackendguy.rentflow.data.PaymentStore
 import com.thebackendguy.rentflow.data.Photo
 import com.thebackendguy.rentflow.data.inr
 import com.thebackendguy.rentflow.data.isValidMobile
+import com.thebackendguy.rentflow.data.label
 import com.thebackendguy.rentflow.data.mobileDigits
+import com.thebackendguy.rentflow.data.remote.ApiResult
+import com.thebackendguy.rentflow.data.remote.BillTotalsDto
+import com.thebackendguy.rentflow.data.remote.UserDto
+import com.thebackendguy.rentflow.data.roomFull
 import com.thebackendguy.rentflow.data.session.SessionUser
 import com.thebackendguy.rentflow.ui.components.AppPage
-import com.thebackendguy.rentflow.ui.components.Caption
 import com.thebackendguy.rentflow.ui.components.FadeIn
 import com.thebackendguy.rentflow.ui.components.FormBar
 import com.thebackendguy.rentflow.ui.components.FormSection
-import com.thebackendguy.rentflow.ui.components.HealthTileSpec
-import com.thebackendguy.rentflow.ui.components.HealthTiles
-import com.thebackendguy.rentflow.ui.components.IconDetail
-import com.thebackendguy.rentflow.ui.components.IconRows
-import com.thebackendguy.rentflow.ui.components.IconTile
-import com.thebackendguy.rentflow.ui.components.InfoCard
 import com.thebackendguy.rentflow.ui.components.PersonAvatar
-import com.thebackendguy.rentflow.ui.components.Pill
+import com.thebackendguy.rentflow.ui.components.PhotoViewer
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTextField
-import com.thebackendguy.rentflow.ui.components.SectionHead
 import com.thebackendguy.rentflow.ui.components.Skeleton
-import com.thebackendguy.rentflow.ui.components.TitledCard
+import com.thebackendguy.rentflow.ui.components.Spinner
+import com.thebackendguy.rentflow.ui.components.Toasts
+import com.thebackendguy.rentflow.ui.components.photoChooser
 import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
+import com.thebackendguy.rentflow.ui.icons.LucideIcon
 import com.thebackendguy.rentflow.ui.screens.LogoutButton
 import com.thebackendguy.rentflow.ui.screens.Shell
-import com.thebackendguy.rentflow.ui.screens.auth.PASSWORD_RULE
-import com.thebackendguy.rentflow.ui.screens.auth.newPasswordError
+import com.thebackendguy.rentflow.ui.screens.auth.emailError
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+/*
+ * The landlord's profile, the web's profile page on a phone (profile/index.jsx):
+ * a header with the photo, verified pills and four portfolio tiles, the details
+ * edited in place, Security & Login and the Account card.
+ */
+
+private val MemberSince = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH)
+private val SignedIn = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", Locale.ENGLISH)
+
+/** The API's timestamp in the phone's time zone, or null. */
+private fun timestamp(value: String?): java.time.ZonedDateTime? =
+    value?.let { runCatching { Instant.parse(it).atZone(ZoneId.systemDefault()) }.getOrNull() }
+
+/** The web's short account id, e.g. RF-A1CA. */
+private fun displayId(id: String): String = if (id.isBlank()) "—" else "RF-${id.takeLast(4).uppercase()}"
+
+private fun signInMethod(method: String?): String? = when (method) {
+    "password" -> "Password"
+    "otp" -> "OTP"
+    else -> null
+}
 
 @Composable
 fun LandlordProfileScreen(
     user: SessionUser?,
     shell: Shell,
-    onEditProfile: () -> Unit,
     onChangePassword: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onOpenProperties: () -> Unit,
+    onOpenRooms: () -> Unit,
+    onOpenTenants: () -> Unit,
+    onOpenCollection: () -> Unit
 ) {
     val loaded = portfolioState()
     val portfolio = loaded.data
-    // Counts pulse while the portfolio loads; a dash if it couldn't load
-    val loadingCounts = portfolio == null && loaded.error == null
     LaunchedEffect(Unit) { LandlordStore.refresh() }
-    // Collection numbers stay sample data until the payments API exists
-    val demo = Demo.tenants
-    val paid = demo.filter { it.status == PayStatus.Paid }
-    val pending = demo.filter { it.status != PayStatus.Paid }
-    val percent = if (demo.isEmpty()) 0 else paid.size * 100 / demo.size
-    val propertyCount = portfolio?.properties?.size
+
+    // The account in full (verified flags, last sign-in), and this month's bill totals
+    var profile by remember { mutableStateOf<UserDto?>(null) }
+    var totals by remember { mutableStateOf<BillTotalsDto?>(null) }
+    val billsVersion by PaymentStore.version.collectAsState()
+    LaunchedEffect(Unit) { (AuthRepository.profile() as? ApiResult.Ok)?.let { profile = it.value } }
+    LaunchedEffect(billsVersion) { (PaymentStore.monthTotals() as? ApiResult.Ok)?.let { totals = it.value } }
 
     AppPage(topBar = { shell.TopBar("Profile") }, bottomBar = { shell.BottomNav(-1) }) {
-        RfCard(onClick = onEditProfile) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                PersonAvatar(user?.name.orEmpty(), user?.photo, size = 64.dp)
-                Column(Modifier.weight(1f)) {
-                    Text(user?.name.orEmpty(), style = RfType.HeadlineSm, color = Rf.OnSurface)
-                    FadeIn(
-                        !loadingCounts,
-                        placeholder = { Skeleton(Modifier.padding(top = 4.dp).width(110.dp).height(10.dp), radius = 5.dp) }
-                    ) {
-                        Text(
-                            if (propertyCount != null) "Landlord • $propertyCount ${if (propertyCount == 1) "property" else "properties"}" else "Landlord",
-                            style = RfType.LabelSm, color = Rf.OnSurfaceVariant
-                        )
-                    }
-                }
-                LIcon(Lucide.ChevronRight, tint = Rf.Outline)
-            }
-        }
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            ProfileHeader(user, profile, onPhotoSaved = { profile = it })
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHead("Owner details") {
-                Row(Modifier.pressable(onEditProfile), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LIcon(Lucide.Pencil, size = 14.dp, tint = Rf.Primary)
-                    Text("Edit", style = RfType.LabelMd, color = Rf.Primary)
-                }
-            }
-            RfCard {
-                IconRows(
-                    listOf(
-                        IconDetail(Lucide.Smartphone, "Mobile", user?.mobileLabel ?: "Not added"),
-                        IconDetail(Lucide.Mail, "Email", user?.email.orEmpty()),
-                        IconDetail(Lucide.Users, "Total tenants", portfolio?.tenants?.size?.toString() ?: if (loadingCounts) null else "—"),
-                        IconDetail(Lucide.Building2, "Properties", propertyCount?.toString() ?: if (loadingCounts) null else "—")
+            // Portfolio tiles; each opens the page its number comes from
+            val rooms = portfolio?.allRooms.orEmpty()
+            val full = portfolio?.let { p -> rooms.count { roomFull(it.occupancyType, p.occupants(it.id).size) } } ?: 0
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile(
+                        "Properties", portfolio?.properties?.size?.toString(),
+                        "${rooms.size} ${if (rooms.size == 1) "room" else "rooms"}", Modifier.weight(1f), onOpenProperties
                     )
-                )
-            }
-        }
-
-        TitledCard("Security") {
-            Row(
-                Modifier.fillMaxWidth().pressable(onChangePassword, pressScale = 0.98f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                IconTile(Lucide.KeyRound, background = Rf.Low, tint = Rf.Primary)
-                Column(Modifier.weight(1f)) {
-                    Text("Change password", style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                    Text("Use at least 8 characters", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+                    StatTile("Rooms full", portfolio?.let { "$full" }, "of ${rooms.size}", Modifier.weight(1f), onOpenRooms)
                 }
-                LIcon(Lucide.ChevronRight, tint = Rf.Outline)
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHead("Collections") { Caption("May cycle") }
-            HealthTiles(
-                listOf(
-                    HealthTileSpec(Lucide.TrendingUp, "May", "$percent%", "Collection progress", Rf.High, Rf.Primary, Rf.OnSurfaceVariant),
-                    HealthTileSpec(Lucide.CircleCheck, "Paid", "${paid.size} tenants", "Rent received", Rf.MintSoft, Rf.Secondary, Rf.Secondary),
-                    HealthTileSpec(
-                        Lucide.TriangleAlert, "Attention", "${pending.size} tenants", "${inr(pending.sumOf { it.rent })} pending",
-                        Rf.ErrorContainer, Rf.Error, Rf.Error,
-                        background = Rf.ErrorContainer.copy(alpha = 0.4f), titleColor = Rf.OnErrorContainer, subColor = Rf.OnErrorContainer
-                    ),
-                    HealthTileSpec(Lucide.Wallet, "Wallet", inr(Demo.WALLET_BALANCE), "Available balance", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High)
-                )
-            )
-        }
-
-        RfCard {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconTile(Lucide.Landmark, background = Rf.High, tint = Rf.Primary)
-                Column(Modifier.weight(1f)) {
-                    Text("Bank account", style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                    Text(Demo.BANK_ACCOUNT, style = RfType.LabelSm, color = Rf.OnSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile("Tenants", portfolio?.tenants?.size?.toString(), "in total", Modifier.weight(1f), onOpenTenants)
+                    val t = totals
+                    StatTile(
+                        "Collected • ${YearMonth.now().label()}", t?.let { inr(it.totalSettled) },
+                        when {
+                            t == null -> ""
+                            t.totalDue > 0 -> "${Math.round(t.totalSettled / t.totalDue * 100)}% of ${inr(t.totalDue)}"
+                            else -> "nothing billed yet"
+                        },
+                        Modifier.weight(1f), onOpenCollection
+                    )
                 }
-                Pill("Verified", background = Rf.MintSoft, content = Rf.Secondary)
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(8.dp)).background(Rf.Low).padding(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MiniStat("May rent received", inr(paid.sumOf { it.rent }), Modifier.weight(1f))
-                MiniStat("Pending rent", inr(pending.sumOf { it.rent }), Modifier.weight(1f))
             }
         }
 
+        PersonalCard(user, profile, onSaved = { profile = it })
+        SecurityCard(profile, onChangePassword)
+        AccountCard(user, profile)
         LogoutButton(onLogout)
     }
 }
 
-@Composable
-private fun MiniStat(label: String, value: String, modifier: Modifier) {
-    Column(modifier) {
-        Text(label, style = RfType.LabelSm, color = Rf.Outline)
-        Text(value, style = RfType.LabelMd.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold), color = Rf.OnSurface)
-    }
-}
+/* ------------------------------ Header ------------------------------ */
 
-/* ------------------------------ Edit profile ------------------------------ */
-
+/** Photo (tap to view; the camera button changes or removes it), name, pills, member since and id. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun EditProfileScreen(user: SessionUser?, shell: Shell, onBack: () -> Unit) {
+private fun ProfileHeader(user: SessionUser?, profile: UserDto?, onPhotoSaved: (UserDto) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var name by rememberSaveable { mutableStateOf(user?.name.orEmpty()) }
-    var mobile by rememberSaveable { mutableStateOf(mobileDigits(user?.mobile)) }
-    var picked by rememberSaveable { mutableStateOf<Uri?>(null) }
-    var submitted by rememberSaveable { mutableStateOf(false) }
+    var viewing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    val name = user?.name.orEmpty()
+    val photo = user?.photo
 
-    val nameErr = if (submitted && name.trim().length < 2) "Enter your full name" else null
-    val mobileErr = if (submitted && !isValidMobile(mobile)) "Enter a valid 10-digit mobile number" else null
-
-    fun save() {
-        submitted = true
-        if (name.trim().length < 2 || !isValidMobile(mobile) || saving) return
+    fun savePhoto(uri: android.net.Uri?) {
+        if (saving) return
         saving = true
         scope.launch {
-            val result = LandlordStore.updateProfile(context, name.trim(), mobile, picked?.let { Photo.Picked(it) })
+            when (val r = LandlordStore.setProfilePhoto(context, uri)) {
+                is ApiResult.Ok -> {
+                    onPhotoSaved(r.value)
+                    Toasts.show(if (uri != null) "Profile picture updated" else "Profile picture removed")
+                }
+                is ApiResult.Fail -> Toasts.error(r.message)
+            }
             saving = false
-            if (result.announce("Profile saved")) onBack()
         }
     }
 
-    AppPage(
-        topBar = { shell.TopBar("Edit Profile", onBack = onBack) },
-        bottomBar = { FormBar("Save changes", ::save, loading = saving, secondary = "Cancel", onSecondary = onBack) }
+    val choose = photoChooser(
+        title = "Profile photo",
+        onView = if (photo != null) ({ viewing = true }) else null,
+        onRemove = if (photo != null) ({ savePhoto(null) }) else null,
+        removeHint = "Your initials show instead"
+    ) { uris -> savePhoto(uris.first()) }
+
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 12.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box {
+                Box(Modifier.pressable(if (photo != null) ({ viewing = true }) else choose)) {
+                    PersonAvatar(name.ifBlank { "?" }, photo, size = 76.dp, shape = RoundedCornerShape(18.dp))
+                    if (saving) {
+                        Box(Modifier.size(76.dp).clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
+                            Spinner(Color.White, size = 22.dp)
+                        }
+                    }
+                }
+                Box(
+                    Modifier.align(Alignment.BottomEnd).offset(x = 6.dp, y = 6.dp).size(30.dp).pressable(choose)
+                        .clip(RoundedCornerShape(10.dp)).background(Rf.Lowest).padding(3.dp).clip(RoundedCornerShape(8.dp)).background(Rf.Primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LIcon(Lucide.Camera, size = 13.dp, tint = Rf.OnPrimary, contentDescription = "Change profile picture")
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                Text(name, style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                FlowRow(
+                    Modifier.padding(top = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    HeaderPill("Landlord", null, Rf.PrimaryFixed, Rf.Primary)
+                    if (profile == null) {
+                        Skeleton(Modifier.size(width = 92.dp, height = 20.dp), radius = 10.dp)
+                    } else {
+                        VerifiedPill("Email", profile.isEmailVerified)
+                        VerifiedPill("Mobile", profile.isMobileVerified)
+                    }
+                }
+            }
+        }
+        // Member since and the account id
+        FadeIn(profile != null, placeholder = { Skeleton(Modifier.fillMaxWidth(0.7f).height(10.dp), radius = 5.dp) }) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val since = timestamp(profile?.createdAt)
+                if (since != null) {
+                    LIcon(Lucide.CalendarDays, size = 13.dp, tint = Rf.OnSurfaceVariant)
+                    Text("Member since ${since.format(MemberSince)}", style = RfType.LabelSm, color = Rf.OnSurfaceVariant)
+                    Text("•", style = RfType.LabelSm, color = Rf.OnSurfaceVariant)
+                }
+                Text("Landlord ID: ${displayId(user?.id.orEmpty())}", style = RfType.LabelSm, color = Rf.OnSurfaceVariant)
+            }
+        }
+    }
+
+    if (viewing && photo != null) {
+        PhotoViewer(listOf(Photo.Stored("", photo)), 0, onClose = { viewing = false })
+    }
+}
+
+@Composable
+private fun HeaderPill(text: String, icon: LucideIcon?, background: Color, content: Color) {
+    Row(
+        Modifier.clip(CircleShape).background(background).padding(horizontal = 9.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        AvatarPicker(name, picked ?: user?.photo, onPick = { picked = it }, onRemove = null)
-        FormSection(Lucide.UserRound, "Your details") {
-            RfTextField(
-                label = "Full name", value = name, onValueChange = { name = it }, icon = Lucide.User,
-                placeholder = "Enter your full name", capitalization = KeyboardCapitalization.Words, error = nameErr
+        if (icon != null) LIcon(icon, size = 12.dp, tint = content)
+        Text(text, style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = content, maxLines = 1)
+    }
+}
+
+@Composable
+private fun VerifiedPill(what: String, ok: Boolean) {
+    if (ok) HeaderPill("$what verified", Lucide.CircleCheck, Rf.MintSoft, Rf.Secondary)
+    else HeaderPill("$what not verified", Lucide.CircleAlert, Rf.AmberSoft, Rf.Amber)
+}
+
+/** A portfolio number with its unit; null [value] pulses while it loads. */
+@Composable
+private fun StatTile(label: String, value: String?, unit: String, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.pressable(onClick, pressScale = 0.97f).clip(RoundedCornerShape(12.dp)).background(Rf.Low)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Caps(label)
+        FadeIn(value != null, placeholder = { Skeleton(Modifier.padding(top = 5.dp).width(64.dp).height(16.dp)) }) {
+            Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(value.orEmpty(), style = RfType.BodyLg.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, maxLines = 1)
+                if (unit.isNotEmpty()) {
+                    Text(unit, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(bottom = 2.dp))
+                }
+            }
+        }
+    }
+}
+
+/* ------------------------------ Cards ------------------------------ */
+
+@Composable
+private fun PanelHead(icon: LucideIcon, title: String, subtitle: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(Rf.PrimaryFixed), contentAlignment = Alignment.Center) {
+            LIcon(icon, size = 17.dp, tint = Rf.Primary)
+        }
+        Column {
+            Text(title, style = RfType.BodyLg.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+            Text(subtitle, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+        }
+    }
+}
+
+/** A field's label with a verified pill on the right. */
+@Composable
+private fun FieldLabel(text: String, verified: Boolean?) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface, modifier = Modifier.weight(1f))
+        when (verified) {
+            true -> HeaderPill("Verified", Lucide.CircleCheck, Rf.MintSoft, Rf.Secondary)
+            false -> HeaderPill("Not verified", null, Rf.Low, Rf.OnSurfaceVariant)
+            null -> Unit
+        }
+    }
+}
+
+/**
+ * Name, email and mobile, edited in place as on the web. Changing one shows the
+ * save bar; only the fields that changed are sent.
+ */
+@Composable
+private fun PersonalCard(user: SessionUser?, profile: UserDto?, onSaved: (UserDto) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val savedName = user?.name.orEmpty()
+    val savedEmail = user?.email.orEmpty()
+    val savedMobile = mobileDigits(user?.mobile)
+    var name by rememberSaveable(savedName) { mutableStateOf(savedName) }
+    var email by rememberSaveable(savedEmail) { mutableStateOf(savedEmail) }
+    var mobile by rememberSaveable(savedMobile) { mutableStateOf(savedMobile) }
+    var submitted by rememberSaveable { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+
+    val dirty = name.trim() != savedName || email.trim().lowercase() != savedEmail.lowercase() || mobile != savedMobile
+    val emailChanged = email.trim().lowercase() != savedEmail.lowercase()
+    val nameErr = if (submitted && name.trim().length < 2) "Enter your full name" else null
+    val emailErr = if (submitted) emailError(email) else null
+    val mobileErr = if (submitted && !isValidMobile(mobile)) "Enter a valid 10-digit mobile number" else null
+
+    fun discard() {
+        name = savedName
+        email = savedEmail
+        mobile = savedMobile
+        submitted = false
+    }
+
+    fun save() {
+        submitted = true
+        if (name.trim().length < 2 || emailError(email) != null || !isValidMobile(mobile) || saving) return
+        saving = true
+        scope.launch {
+            val result = LandlordStore.updateProfile(
+                name = name.trim().takeIf { it != savedName },
+                email = email.takeIf { emailChanged },
+                mobile = mobile.takeIf { it != savedMobile }
             )
-            RfTextField(
-                label = "Mobile number", value = mobile, onValueChange = { mobile = it.filter(Char::isDigit).take(10) },
-                icon = Lucide.Phone, placeholder = "98765 43210", prefix = "+91", keyboardType = KeyboardType.Number, error = mobileErr
+            saving = false
+            when (result) {
+                is ApiResult.Ok -> {
+                    submitted = false
+                    onSaved(result.value)
+                    Toasts.show("Profile updated")
+                }
+                is ApiResult.Fail -> Toasts.error(result.message)
+            }
+        }
+    }
+
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(0.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            PanelHead(Lucide.UserRound, "Personal & Contact Details", "Name, email and phone on your account")
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FieldLabel("Full name", null)
+                RfTextField(
+                    label = "", value = name, onValueChange = { name = it }, icon = Lucide.User, placeholder = "Your full name",
+                    capitalization = KeyboardCapitalization.Words, error = nameErr
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FieldLabel("Email address", profile?.isEmailVerified)
+                RfTextField(
+                    label = "", value = email, onValueChange = { email = it.trim() }, icon = Lucide.Mail, placeholder = "you@example.com",
+                    keyboardType = KeyboardType.Email, error = emailErr,
+                    hint = if (emailChanged) "You’ll sign in with this email after you save." else null
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FieldLabel("Mobile number", profile?.isMobileVerified)
+                RfTextField(
+                    label = "", value = mobile, onValueChange = { mobile = it.filter(Char::isDigit).take(10) }, icon = Lucide.Phone,
+                    placeholder = "98765 43210", prefix = "+91", keyboardType = KeyboardType.Number, imeAction = ImeAction.Done,
+                    onImeAction = ::save, error = mobileErr
+                )
+            }
+            Text("Tenants see this name and phone on their bills.", style = RfType.LabelSm, color = Rf.OnSurfaceVariant)
+        }
+        if (dirty) {
+            HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+            Row(
+                Modifier.fillMaxWidth().background(Rf.Low).padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("You have unsaved changes", style = RfType.LabelSm.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface, modifier = Modifier.weight(1f))
+                Text(
+                    "Discard", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface,
+                    modifier = Modifier.pressable(::discard).clip(RoundedCornerShape(10.dp)).background(Rf.Lowest)
+                        .border(1.dp, Rf.OutlineVariant, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+                Row(
+                    Modifier.pressable(::save, enabled = !saving).clip(RoundedCornerShape(10.dp)).background(Rf.Primary)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    if (saving) Spinner(Rf.OnPrimary, size = 14.dp) else LIcon(Lucide.Save, size = 14.dp, tint = Rf.OnPrimary)
+                    Text(if (saving) "Saving…" else "Save changes", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnPrimary)
+                }
+            }
+        }
+    }
+}
+
+/** Password with Change Password, and the last sign-in. */
+@Composable
+private fun SecurityCard(profile: UserDto?, onChangePassword: () -> Unit) {
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 12.dp) {
+        PanelHead(Lucide.ShieldCheck, "Security & Login", "Your password and how you sign in")
+        SecurityRow(Lucide.KeyRound, "Password", "Use at least 6 characters. Change it if you think someone else knows it.") {
+            Text(
+                "Change Password", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
+                modifier = Modifier.pressable(onChangePassword).clip(RoundedCornerShape(10.dp)).background(Rf.PrimaryFixed)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             )
-            RfTextField(
-                label = "Email address", value = user?.email.orEmpty(), onValueChange = {}, icon = Lucide.Mail, placeholder = "",
-                enabled = false, hint = "You sign in with this email, so it can’t be changed here."
+        }
+        timestamp(profile?.lastLoginAt)?.let { at ->
+            val method = signInMethod(profile?.loginMethod)
+            SecurityRow(Lucide.Clock3, "Last sign-in", at.format(SignedIn) + (method?.let { " • with ${if (it == "OTP") "OTP" else "password"}" } ?: ""))
+        }
+    }
+}
+
+@Composable
+private fun SecurityRow(icon: LucideIcon, title: String, caption: String, action: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        LIcon(icon, size = 18.dp, tint = Rf.OnSurfaceVariant)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface)
+            Text(caption, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+        }
+        action?.invoke()
+    }
+}
+
+/** Facts about the landlord account, straight from the profile API. */
+@Composable
+private fun AccountCard(user: SessionUser?, profile: UserDto?) {
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 8.dp) {
+        PanelHead(Lucide.Info, "Account", "Details of this landlord account")
+        Column {
+            AccountRow("Landlord ID", displayId(user?.id.orEmpty()), first = true)
+            timestamp(profile?.createdAt)?.let { AccountRow("Member since", it.format(MemberSince)) }
+            signInMethod(profile?.loginMethod)?.let { AccountRow("Sign-in method", it) }
+            AccountRow("Email", profile?.let { if (it.isEmailVerified) "Verified" else "Not verified" }, ok = profile?.isEmailVerified == true)
+            AccountRow("Mobile", profile?.let { if (it.isMobileVerified) "Verified" else "Not verified" }, ok = profile?.isMobileVerified == true)
+        }
+    }
+}
+
+/** A null [value] pulses while the profile loads. */
+@Composable
+private fun AccountRow(label: String, value: String?, first: Boolean = false, ok: Boolean? = null) {
+    if (!first) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = RfType.BodySm, color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f))
+        FadeIn(value != null, placeholder = { Skeleton(Modifier.width(70.dp).height(13.dp)) }) {
+            Text(
+                value.orEmpty(), style = RfType.BodySm.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.End,
+                color = when (ok) {
+                    true -> Rf.Secondary
+                    false -> Rf.OnSurfaceVariant
+                    null -> Rf.OnSurface
+                }
             )
         }
     }
@@ -236,27 +494,27 @@ fun EditProfileScreen(user: SessionUser?, shell: Shell, onBack: () -> Unit) {
 
 /* ------------------------------ Change password ------------------------------ */
 
+/** The web's rule for a new password (the API's changePasswordSchema). */
+private const val MIN_PASSWORD = 6
+
 @Composable
 fun ChangePasswordScreen(shell: Shell, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var current by rememberSaveable { mutableStateOf("") }
     var next by rememberSaveable { mutableStateOf("") }
     var confirm by rememberSaveable { mutableStateOf("") }
-    var submitted by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
 
-    val currentErr = if (submitted && current.isEmpty()) "Enter your current password" else null
-    val nextErr = if (submitted) newPasswordError(next) else null
-    val confirmErr = when {
-        !submitted -> null
-        confirm.isEmpty() -> "Confirm your new password"
-        confirm != next -> "Passwords do not match"
-        else -> null
-    }
+    // The web's three checks; the button saves once all are met
+    val rules = listOf(
+        "At least $MIN_PASSWORD characters" to (next.length >= MIN_PASSWORD),
+        "Different from your current password" to (next.isNotEmpty() && next != current),
+        "Both new passwords match" to (confirm.isNotEmpty() && next == confirm)
+    )
+    val ready = current.isNotEmpty() && rules.all { it.second }
 
     fun save() {
-        submitted = true
-        if (current.isEmpty() || newPasswordError(next) != null || confirm != next || saving) return
+        if (!ready || saving) return
         saving = true
         scope.launch {
             val result = LandlordStore.changePassword(current, next)
@@ -267,23 +525,39 @@ fun ChangePasswordScreen(shell: Shell, onBack: () -> Unit) {
 
     AppPage(
         topBar = { shell.TopBar("Change Password", onBack = onBack) },
-        bottomBar = { FormBar("Update password", ::save, loading = saving) }
+        bottomBar = { FormBar("Change password", ::save, loading = saving, secondary = "Cancel", onSecondary = onBack, enabled = ready) }
     ) {
         FormSection(Lucide.KeyRound, "Password") {
             RfTextField(
                 label = "Current password", value = current, onValueChange = { current = it }, icon = Lucide.Lock,
-                placeholder = "Enter your current password", isPassword = true, error = currentErr
+                placeholder = "Your current password", isPassword = true
             )
             RfTextField(
                 label = "New password", value = next, onValueChange = { next = it }, icon = Lucide.Lock,
-                placeholder = "Create a new password", isPassword = true, hint = PASSWORD_RULE, error = nextErr
+                placeholder = "At least $MIN_PASSWORD characters", isPassword = true
             )
             RfTextField(
                 label = "Confirm new password", value = confirm, onValueChange = { confirm = it }, icon = Lucide.Lock,
-                placeholder = "Re-enter new password", isPassword = true, imeAction = ImeAction.Done, onImeAction = ::save,
-                error = confirmErr
+                placeholder = "Type the new password again", isPassword = true, imeAction = ImeAction.Done, onImeAction = ::save
             )
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                rules.forEach { (text, ok) ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        LIcon(Lucide.CircleCheck, size = 15.dp, tint = if (ok) Rf.Secondary else Rf.Outline)
+                        Text(
+                            text, style = RfType.LabelMd.copy(fontWeight = if (ok) FontWeight.SemiBold else FontWeight.Medium),
+                            color = if (ok) Rf.Secondary else Rf.OnSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
-        InfoCard(Lucide.ShieldCheck, "You stay signed in here", "Use the new password the next time you sign in.", iconColor = Rf.Primary)
+        Text(
+            "Forgot your current password? Sign out and use “Forgot Password?” on the sign-in page.",
+            style = RfType.BodySm, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)
+        )
     }
 }

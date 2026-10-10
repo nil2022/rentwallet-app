@@ -23,7 +23,13 @@ data class UserDto(
     val mobile: String? = null,
     val role: String? = null,
     val profilePic: String? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    // The profile API also says how the account is verified and was last used
+    val isEmailVerified: Boolean = false,
+    val isMobileVerified: Boolean = false,
+    val lastLoginAt: String? = null,
+    val loginMethod: String? = null,
+    val createdAt: String? = null
 )
 
 @Serializable

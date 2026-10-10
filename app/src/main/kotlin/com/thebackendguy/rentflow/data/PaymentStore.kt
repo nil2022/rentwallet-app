@@ -185,6 +185,13 @@ object PaymentStore {
         })
     }
 
+    /** This month's totals across all properties (the Profile's Collected tile); one bill is enough for them. */
+    suspend fun monthTotals(): ApiResult<BillTotalsDto> =
+        when (val r = apiCall { api.bills(monthYear = YearMonth.now().apiMonth(), limit = 1) }) {
+            is ApiResult.Fail -> r
+            is ApiResult.Ok -> ApiResult.Ok(r.value.summary ?: BillTotalsDto())
+        }
+
     /** Overview's rent figures, from the web dashboard's four calls. */
     suspend fun overview(): ApiResult<RentOverview> = coroutineScope {
         val now = YearMonth.now()

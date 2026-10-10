@@ -6,7 +6,7 @@ import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.ChangePasswordBody
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.remote.NewTenantBody
-import com.thebackendguy.rentflow.data.remote.ProfileBody
+import com.thebackendguy.rentflow.data.remote.UserDto
 import com.thebackendguy.rentflow.data.remote.PropertyBody
 import com.thebackendguy.rentflow.data.remote.PropertyDto
 import com.thebackendguy.rentflow.data.remote.RoomBody
@@ -31,8 +31,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** Data a screen shows, with whether a reload is running and why the last one failed. */
 data class Loadable<out T>(val data: T? = null, val loading: Boolean = false, val error: String? = null)
@@ -225,18 +227,37 @@ object LandlordStore {
 
     /* ------------------------------ Profile ------------------------------ */
 
-    suspend fun updateProfile(context: Context, name: String, mobile: String, photo: Photo.Picked?): ApiResult<Unit> {
-        val user = SessionStore.session.value?.user ?: return ApiResult.Fail("Please sign in again.")
-        val key = if (photo == null) null else when (val r = Uploads.upload(context, photo.uri, UploadFolder.Avatar)) {
+    /**
+     * Saves the profile fields that changed (null leaves one as it is), as the web
+     * sends them, and updates the signed-in account. Returns the saved account.
+     */
+    suspend fun updateProfile(name: String?, email: String?, mobile: String?): ApiResult<UserDto> = patchProfile {
+        name?.let { put("fullName", it) }
+        email?.let { put("email", it.trim().lowercase()) }
+        mobile?.let { put("mobile", it) }
+    }
+
+    /** Uploads and saves a new profile photo, or removes it when [uri] is null. */
+    suspend fun setProfilePhoto(context: Context, uri: Uri?): ApiResult<UserDto> {
+        val key = if (uri == null) null else when (val r = Uploads.upload(context, uri, UploadFolder.Avatar)) {
             is ApiResult.Fail -> return r
             is ApiResult.Ok -> r.value
         }
-        return when (val saved = apiCall { api.updateProfile(ProfileBody(user.id, name, mobile, key)) }) {
+        return patchProfile { put("profilePic", if (key == null) JsonNull else JsonPrimitive(key)) }
+    }
+
+    private suspend fun patchProfile(fields: JsonObjectBuilder.() -> Unit): ApiResult<UserDto> {
+        val user = SessionStore.session.value?.user ?: return ApiResult.Fail("Please sign in again.")
+        val body = buildJsonObject {
+            put("userId", user.id)
+            fields()
+        }
+        return when (val saved = apiCall { api.updateProfile(body) }) {
             is ApiResult.Fail -> saved
-            is ApiResult.Ok -> {
-                saved.value.data?.let { SessionStore.updateUser(it.toSessionUser(user.role)) }
-                ApiResult.Ok(Unit)
-            }
+            is ApiResult.Ok -> saved.value.data?.let {
+                SessionStore.updateUser(it.toSessionUser(user.role))
+                ApiResult.Ok(it)
+            } ?: ApiResult.Fail("The server sent an empty reply. Please try again.")
         }
     }
 

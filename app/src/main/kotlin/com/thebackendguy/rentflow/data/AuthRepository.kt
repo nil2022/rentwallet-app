@@ -51,6 +51,18 @@ object AuthRepository {
         apiCall { api.verifyOtp(UserRole.Landlord.apiPath, OtpBody(email.normalized(), code), true) }.discard()
 
     /** Refreshes the saved name and contact details; a rejected token signs the user out. */
+    /** The signed-in account in full (verified flags, last sign-in), also kept as the session's user. */
+    suspend fun profile(): ApiResult<UserDto> {
+        val user = SessionStore.session.value?.user ?: return ApiResult.Fail("Please sign in again.")
+        return when (val result = apiCall { api.profile(user.role.apiPath) }) {
+            is ApiResult.Fail -> result
+            is ApiResult.Ok -> result.value.data?.let {
+                SessionStore.updateUser(it.toSessionUser(user.role))
+                ApiResult.Ok(it)
+            } ?: ApiResult.Fail("The server sent an empty reply. Please try again.")
+        }
+    }
+
     suspend fun refreshProfile() {
         val user = SessionStore.session.value?.user ?: return
         val result = apiCall { api.profile(user.role.apiPath) }

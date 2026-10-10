@@ -64,7 +64,6 @@ import com.thebackendguy.rentflow.ui.screens.landlord.AssignRoomScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.BillTenantPickerScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RecordPaymentScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.ChangePasswordScreen
-import com.thebackendguy.rentflow.ui.screens.landlord.EditProfileScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.LandlordOverviewScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.LandlordProfileScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.PropertiesScreen
@@ -97,7 +96,7 @@ private enum class Screen {
     Login, ForgotPassword, Register,
     TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
     LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
-    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, RentHistory, PickBillTenant, RecordPayment, LandlordProfile, EditProfile, ChangePassword
+    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, RentHistory, PickBillTenant, RecordPayment, LandlordProfile, ChangePassword
 }
 
 /** One entry of the back stack: a screen and the ids it shows (see each screen in [RentFlowApp]). */
@@ -536,12 +535,16 @@ private fun RentFlowApp() {
                         Screen.LandlordProfile -> LandlordProfileScreen(
                             user = user,
                             shell = shell,
-                            onEditProfile = { go(Screen.EditProfile) },
                             onChangePassword = { go(Screen.ChangePassword) },
-                            onLogout = ::signOut
+                            onLogout = ::signOut,
+                            onOpenProperties = { openTab(Screen.Properties) },
+                            onOpenRooms = { openTab(Screen.Rooms) },
+                            onOpenTenants = { openTab(Screen.Tenants) },
+                            onOpenCollection = {
+                                showCollectionMonth(YearMonth.now().apiMonth(), null)
+                                openTab(Screen.RentCollection)
+                            }
                         )
-
-                        Screen.EditProfile -> EditProfileScreen(user = user, shell = shell, onBack = ::back)
 
                         Screen.ChangePassword -> ChangePasswordScreen(shell = shell, onBack = ::back)
                     }

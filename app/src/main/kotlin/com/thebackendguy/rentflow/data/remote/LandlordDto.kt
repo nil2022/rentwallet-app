@@ -148,9 +148,6 @@ data class TenantUpdateBody(
 )
 
 @Serializable
-data class ProfileBody(val userId: String, val fullName: String, val mobile: String, val profilePic: String?)
-
-@Serializable
 data class ChangePasswordBody(val oldPassword: String, val newPassword: String)
 
 @Serializable

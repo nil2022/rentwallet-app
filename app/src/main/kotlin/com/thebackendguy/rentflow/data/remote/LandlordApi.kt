@@ -66,7 +66,7 @@ interface LandlordApi {
 
     /** The account's id travels in the body as `userId`. */
     @PATCH("landlord")
-    suspend fun updateProfile(@Body body: ProfileBody): ApiEnvelope<UserDto>
+    suspend fun updateProfile(@Body body: JsonObject): ApiEnvelope<UserDto>
 
     @PATCH("landlord/auth/change-password")
     suspend fun changePassword(@Body body: ChangePasswordBody): ApiEnvelope<JsonElement>
