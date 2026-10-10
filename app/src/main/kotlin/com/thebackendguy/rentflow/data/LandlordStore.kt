@@ -138,8 +138,8 @@ object LandlordStore {
         when (val keys = photoKeys(context, photos, UploadFolder.Property)) {
             is ApiResult.Fail -> keys
             is ApiResult.Ok -> {
-                val full = body.copy(images = keys.value)
-                when (val saved = apiCall { if (id == null) api.createProperty(full) else api.updateProperty(id, full) }) {
+                val full = body.copy(propertyId = id, images = keys.value)
+                when (val saved = apiCall { if (id == null) api.createProperty(full) else api.updateProperty(full) }) {
                     is ApiResult.Fail -> saved
                     is ApiResult.Ok -> ApiResult.Ok(saved.value.data?.id ?: id.orEmpty())
                 }
@@ -157,8 +157,8 @@ object LandlordStore {
             is ApiResult.Fail -> keys
             is ApiResult.Ok -> {
                 // The API ignores the property on an edit, so it's only sent for a new room
-                val full = body.copy(images = keys.value, propertyId = if (id == null) body.propertyId else null)
-                when (val saved = apiCall { if (id == null) api.createRoom(full) else api.updateRoom(id, full) }) {
+                val full = body.copy(roomId = id, images = keys.value, propertyId = if (id == null) body.propertyId else null)
+                when (val saved = apiCall { if (id == null) api.createRoom(full) else api.updateRoom(full) }) {
                     is ApiResult.Fail -> saved
                     is ApiResult.Ok -> ApiResult.Ok(saved.value.data?.id ?: id.orEmpty())
                 }
@@ -204,7 +204,7 @@ object LandlordStore {
             removePhoto -> ""
             else -> null
         }
-        apiCall { api.updateTenant(id, TenantUpdateBody(name, mobile, active, key)) }.discard()
+        apiCall { api.updateTenant(TenantUpdateBody(id, name, mobile, active, key)) }.discard()
     }
 
     suspend fun deleteTenant(id: String): ApiResult<Unit> = change { apiCall { api.deleteTenant(id) }.discard() }
@@ -225,7 +225,7 @@ object LandlordStore {
             is ApiResult.Fail -> return r
             is ApiResult.Ok -> r.value
         }
-        return when (val saved = apiCall { api.updateProfile(user.id, ProfileBody(name, mobile, key)) }) {
+        return when (val saved = apiCall { api.updateProfile(ProfileBody(user.id, name, mobile, key)) }) {
             is ApiResult.Fail -> saved
             is ApiResult.Ok -> {
                 saved.value.data?.let { SessionStore.updateUser(it.toSessionUser(user.role)) }

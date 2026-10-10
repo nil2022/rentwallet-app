@@ -17,8 +17,9 @@ interface LandlordApi {
     @POST("landlord/property")
     suspend fun createProperty(@Body body: PropertyBody): ApiEnvelope<PropertyDto>
 
-    @PATCH("landlord/property/{id}")
-    suspend fun updateProperty(@Path("id") id: String, @Body body: PropertyBody): ApiEnvelope<PropertyDto>
+    /** The id travels in the body as `propertyId`. */
+    @PATCH("landlord/property")
+    suspend fun updateProperty(@Body body: PropertyBody): ApiEnvelope<PropertyDto>
 
     @DELETE("landlord/property/{id}")
     suspend fun deleteProperty(@Path("id") id: String): ApiEnvelope<JsonElement>
@@ -33,8 +34,9 @@ interface LandlordApi {
     @POST("landlord/room")
     suspend fun createRoom(@Body body: RoomBody): ApiEnvelope<RoomDto>
 
-    @PATCH("landlord/room/{id}")
-    suspend fun updateRoom(@Path("id") id: String, @Body body: RoomBody): ApiEnvelope<RoomDto>
+    /** The id travels in the body as `roomId`. */
+    @PATCH("landlord/room")
+    suspend fun updateRoom(@Body body: RoomBody): ApiEnvelope<RoomDto>
 
     @DELETE("landlord/room/{id}")
     suspend fun deleteRoom(@Path("id") id: String): ApiEnvelope<JsonElement>
@@ -46,8 +48,9 @@ interface LandlordApi {
     @POST("landlord/tenant")
     suspend fun createTenant(@Body body: NewTenantBody): ApiEnvelope<TenantDto>
 
-    @PATCH("landlord/tenant/{id}")
-    suspend fun updateTenant(@Path("id") id: String, @Body body: TenantUpdateBody): ApiEnvelope<TenantDto>
+    /** The id travels in the body as `tenantId`. */
+    @PATCH("landlord/tenant")
+    suspend fun updateTenant(@Body body: TenantUpdateBody): ApiEnvelope<TenantDto>
 
     @DELETE("landlord/tenant/{id}")
     suspend fun deleteTenant(@Path("id") id: String): ApiEnvelope<JsonElement>
@@ -60,8 +63,9 @@ interface LandlordApi {
     @PATCH("landlord/lease/{id}")
     suspend fun updateLeaseStatus(@Path("id") id: String, @Body body: LeaseStatusBody): ApiEnvelope<LeaseDto>
 
-    @PATCH("landlord/{id}")
-    suspend fun updateProfile(@Path("id") id: String, @Body body: ProfileBody): ApiEnvelope<UserDto>
+    /** The account's id travels in the body as `userId`. */
+    @PATCH("landlord")
+    suspend fun updateProfile(@Body body: ProfileBody): ApiEnvelope<UserDto>
 
     @PATCH("landlord/auth/change-password")
     suspend fun changePassword(@Body body: ChangePasswordBody): ApiEnvelope<JsonElement>

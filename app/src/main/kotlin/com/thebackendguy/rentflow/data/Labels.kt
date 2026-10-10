@@ -11,7 +11,9 @@ import kotlin.math.roundToInt
 
 /** API value and label, in the order the web lists them. */
 val PropertyTypes = listOf("apartment" to "Apartment", "house" to "House", "villa" to "Villa", "hostel" to "Hostel", "pg" to "PG")
-val OccupancyTypes = listOf("single" to "Single", "double" to "Double", "triple" to "Triple", "other" to "Other")
+val OccupancyTypes = listOf(
+    "single" to "Single", "double" to "Double", "triple" to "Triple", "shared" to "Shared", "other" to "Other"
+)
 
 fun propertyTypeLabel(type: String) = PropertyTypes.find { it.first == type }?.second ?: type.replaceFirstChar { it.uppercase() }
 fun occupancyLabel(type: String?) = OccupancyTypes.find { it.first == type }?.second

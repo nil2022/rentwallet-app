@@ -104,10 +104,12 @@ data class PresignDto(val key: String = "", val uploadUrl: String = "")
 
 /* ------------------------------ Requests ------------------------------ */
 // No default values here: the JSON encoder leaves defaults out, and an edit
-// that sets a switch back to false must still send it.
+// that sets a switch back to false must still send it. The one exception is the
+// record's id: an edit sends it in the body (never in the URL), a create leaves it null.
 
 @Serializable
 data class PropertyBody(
+    val propertyId: String? = null,
     val propertyName: String,
     val address: String,
     val city: String,
@@ -125,6 +127,7 @@ data class PropertyBody(
 
 @Serializable
 data class RoomBody(
+    val roomId: String? = null,
     val propertyId: String?,
     val roomNumber: String,
     val floor: Int,
@@ -151,6 +154,7 @@ data class NewTenantBody(
 
 @Serializable
 data class TenantUpdateBody(
+    val tenantId: String,
     val fullName: String,
     val mobile: String,
     val isActive: Boolean,
@@ -178,7 +182,7 @@ data class LeaseBody(
 data class LeaseStatusBody(val status: String)
 
 @Serializable
-data class ProfileBody(val fullName: String, val mobile: String, val profilePic: String?)
+data class ProfileBody(val userId: String, val fullName: String, val mobile: String, val profilePic: String?)
 
 @Serializable
 data class ChangePasswordBody(val oldPassword: String, val newPassword: String)
