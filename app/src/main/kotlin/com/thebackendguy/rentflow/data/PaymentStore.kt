@@ -3,6 +3,7 @@ package com.thebackendguy.rentflow.data
 import com.thebackendguy.rentflow.data.remote.ApiEnvelope
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.BillDto
+import com.thebackendguy.rentflow.data.remote.BillSummaryDto
 import com.thebackendguy.rentflow.data.remote.BillTotalsDto
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.remote.apiCall
@@ -102,6 +103,13 @@ object PaymentStore {
         when (val r = apiCall { api.bills(monthYear = month?.apiMonth(), tenantId = tenantId, roomId = roomId, limit = PAGE_SIZE) }) {
             is ApiResult.Fail -> r
             is ApiResult.Ok -> ApiResult.Ok(r.value.data.orEmpty())
+        }
+
+    /** Rent History: totals for every month from [from] to [to], for all properties or [propertyId]. */
+    suspend fun summary(from: YearMonth, to: YearMonth, propertyId: String?): ApiResult<BillSummaryDto> =
+        when (val r = apiCall { api.summary(from.apiMonth(), to.apiMonth(), propertyId) }) {
+            is ApiResult.Fail -> r
+            is ApiResult.Ok -> r.value.data?.let { ApiResult.Ok(it) } ?: ApiResult.Fail("The server sent an empty reply. Please try again.")
         }
 
     /** Saves a new bill ([billId] null) or changes one; every screen showing bills loads again. */

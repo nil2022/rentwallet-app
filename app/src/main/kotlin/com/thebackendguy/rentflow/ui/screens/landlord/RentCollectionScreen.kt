@@ -114,6 +114,14 @@ private object CollectionMemory {
     var overdueView: Boolean = false
 }
 
+/** Opens Rent Collection on [month] ("YYYY-MM") and [propertyId], as Rent History's months do. */
+internal fun showCollectionMonth(month: String, propertyId: String?) {
+    CollectionMemory.month = month
+    CollectionMemory.propertyId = propertyId
+    CollectionMemory.filter = 0
+    CollectionMemory.overdueView = false
+}
+
 private enum class BillFilter(val key: String, val label: String) {
     All("all", "All"), Pending("pending", "Pending"), Partial("partial", "Partial"), Paid("paid", "Paid")
 }
@@ -128,7 +136,8 @@ fun RentCollectionScreen(
     shell: Shell,
     onRecord: () -> Unit,
     onRecordFor: (tenantId: String, month: String) -> Unit,
-    onEditBill: (tenantId: String, billId: String) -> Unit
+    onEditBill: (tenantId: String, billId: String) -> Unit,
+    onHistory: () -> Unit
 ) {
     val portfolioState = portfolioState()
     val now = YearMonth.now()
@@ -170,12 +179,23 @@ fun RentCollectionScreen(
     Box(Modifier.fillMaxSize()) {
         AppPage(topBar = { shell.TopBar("Payments") }, bottomBar = { shell.BottomNav(4) }) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column {
-                    Text("Rent Collection", style = RfType.HeadlineMd.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
-                    Text(
-                        "Bills and payments across your properties.", style = RfType.BodySm, color = Rf.OnSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Rent Collection", style = RfType.HeadlineMd.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                        Text(
+                            "Bills and payments across your properties.", style = RfType.BodySm, color = Rf.OnSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    Row(
+                        Modifier.height(36.dp).pressable(onHistory).softShadow(RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp))
+                            .background(Rf.Lowest).padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        LIcon(Lucide.History, size = 15.dp, tint = Rf.Primary)
+                        Text("History", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
+                    }
                 }
 
                 val data = loaded.data

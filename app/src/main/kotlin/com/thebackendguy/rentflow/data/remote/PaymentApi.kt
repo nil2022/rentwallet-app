@@ -31,6 +31,17 @@ interface PaymentApi {
         @Query("limit") limit: Int = 100
     ): ApiEnvelope<List<BillDto>>
 
+    /**
+     * Month-by-month totals from [from] to [to] ("YYYY-MM", both included, at most 36
+     * months); months without bills come back with zeros, oldest first.
+     */
+    @GET("landlord/payment/summary")
+    suspend fun summary(
+        @Query("from") from: String,
+        @Query("to") to: String,
+        @Query("propertyId") propertyId: String? = null
+    ): ApiEnvelope<BillSummaryDto>
+
     @GET("landlord/payment/{id}")
     suspend fun bill(@Path("id") id: String): ApiEnvelope<BillDto>
 
@@ -122,6 +133,22 @@ data class BillDto(
     val paymentProof: String? = null,
     val notes: String? = null
 )
+
+/** One month of Rent History (or the whole range, with an empty [monthYear]). */
+@Serializable
+data class MonthTotalsDto(
+    val monthYear: String = "",
+    @Serializable(with = LenientInt::class) val bills: Int = 0,
+    @Serializable(with = LenientDouble::class) val totalDue: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalPaid: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalPending: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalSettled: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalCreditApplied: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalAdvanceHeld: Double = 0.0
+)
+
+@Serializable
+data class BillSummaryDto(val months: List<MonthTotalsDto> = emptyList(), val total: MonthTotalsDto = MonthTotalsDto())
 
 /**
  * Totals of every bill a list matched. [totalSettled] is the part of the bills

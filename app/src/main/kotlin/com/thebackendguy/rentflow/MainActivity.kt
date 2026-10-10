@@ -71,6 +71,8 @@ import com.thebackendguy.rentflow.ui.screens.landlord.PropertyDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.PropertyFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RentCollectionScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.RentHistoryScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.showCollectionMonth
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantDetailsScreen
@@ -92,7 +94,7 @@ private enum class Screen {
     Login, ForgotPassword, Register,
     TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
     LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
-    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, PickBillTenant, RecordPayment, LandlordProfile, EditProfile, ChangePassword
+    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, RentHistory, PickBillTenant, RecordPayment, LandlordProfile, EditProfile, ChangePassword
 }
 
 /** One entry of the back stack: a screen and the ids it shows (see each screen in [RentFlowApp]). */
@@ -254,6 +256,8 @@ private fun RentFlowApp() {
     val tabScreens = if (role == UserRole.Tenant) TenantTabScreens else LandlordTabScreens
     // A tenant's Profile is their last tab; a landlord's opens from the photo and the menu, as on the web
     val profileScreen = if (role == UserRole.Tenant) Screen.TenantProfile else Screen.LandlordProfile
+    // The side menu: a landlord's tabs, then Rent History (its other entries do nothing yet)
+    val menuScreens = if (role == UserRole.Tenant) TenantTabScreens else LandlordTabScreens + Screen.RentHistory
     val shell = Shell(
         role = role,
         name = user?.name.orEmpty(),
@@ -274,14 +278,14 @@ private fun RentFlowApp() {
                     val tenant = role == UserRole.Tenant
                     AppDrawer(
                         tabs = if (tenant) TenantTabs else LandlordMenu,
-                        selected = tabScreens.indexOf(route.screen).takeIf { it >= 0 },
+                        selected = menuScreens.indexOf(route.screen).takeIf { it >= 0 },
                         tagline = if (tenant) "Tenant" else "Property Manager",
                         name = user?.name.orEmpty(),
                         roleLabel = if (tenant) "Tenant" else "Owner",
                         photo = user?.photo,
                         onSelect = { index ->
                             // The menu's placeholder entries can't be tapped, so every index here has a screen
-                            tabScreens.getOrNull(index)?.let(::openTab)
+                            menuScreens.getOrNull(index)?.let(::openTab)
                             scope.launch { drawerState.close() }
                         },
                         onProfile = {
@@ -488,7 +492,17 @@ private fun RentFlowApp() {
                             shell = shell,
                             onRecord = { go(Screen.PickBillTenant) },
                             onRecordFor = { tenantId, month -> go(Screen.RecordPayment, tenantId, month) },
-                            onEditBill = { tenantId, billId -> go(Screen.RecordPayment, tenantId, "$EDIT_BILL$billId") }
+                            onEditBill = { tenantId, billId -> go(Screen.RecordPayment, tenantId, "$EDIT_BILL$billId") },
+                            onHistory = { go(Screen.RentHistory) }
+                        )
+
+                        Screen.RentHistory -> RentHistoryScreen(
+                            shell = shell,
+                            onBack = ::back,
+                            onOpenMonth = { month, propertyId ->
+                                showCollectionMonth(month, propertyId)
+                                openTab(Screen.RentCollection)
+                            }
                         )
 
                         Screen.PickBillTenant -> BillTenantPickerScreen(

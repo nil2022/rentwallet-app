@@ -36,8 +36,8 @@ val LandlordTabs = listOf(
 
 /**
  * The web's sidebar, in its order and words. The first five open the tabs above
- * (Rent Collection is the Payments tab); the rest have no screen in the app yet,
- * so (like the web's placeholders) they do nothing.
+ * (Rent Collection is the Payments tab), Rent History opens its screen; the rest
+ * have no screen in the app yet, so (like the web's placeholders) they do nothing.
  */
 val LandlordMenu = listOf(
     NavTab("Dashboard", Lucide.LayoutDashboard),
@@ -45,7 +45,7 @@ val LandlordMenu = listOf(
     NavTab("Rooms", Lucide.DoorOpen),
     NavTab("Tenants", Lucide.Users),
     NavTab("Rent Collection", Lucide.WalletCards),
-    NavTab("Rent History", Lucide.History, placeholder = true),
+    NavTab("Rent History", Lucide.History),
     NavTab("Rent Settings", Lucide.SlidersHorizontal, placeholder = true),
     NavTab("Expenses", Lucide.Receipt, placeholder = true),
     NavTab("Reports", Lucide.ChartColumn, placeholder = true),
