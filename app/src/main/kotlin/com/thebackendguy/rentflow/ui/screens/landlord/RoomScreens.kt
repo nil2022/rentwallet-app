@@ -83,6 +83,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun RoomDetailsScreen(
     roomId: String,
+    tab: Int,
     shell: Shell,
     onBack: () -> Unit,
     onEdit: () -> Unit,
@@ -97,7 +98,7 @@ fun RoomDetailsScreen(
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    AppPage(topBar = { shell.TopBar(room?.let { "Room ${it.roomNumber}" } ?: "Room", onBack = onBack) }, bottomBar = { shell.BottomNav(1) }) {
+    AppPage(topBar = { shell.TopBar(room?.let { "Room ${it.roomNumber}" } ?: "Room", onBack = onBack) }, bottomBar = { shell.BottomNav(tab) }) {
         PortfolioContent(state, loadingImageHeight = 120.dp) { portfolio ->
             if (room == null) {
                 NotFound("Room", onBack)

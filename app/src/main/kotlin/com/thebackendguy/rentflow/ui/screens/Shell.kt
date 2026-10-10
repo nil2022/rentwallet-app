@@ -25,11 +25,29 @@ import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 
 val TenantTabs = listOf(NavTab("Home", Lucide.House), NavTab("Payments", Lucide.History), NavTab("Profile", Lucide.User))
+/** The web's phone bottom bar. Payments joins when its screens are built; Profile opens from the photo and the menu. */
 val LandlordTabs = listOf(
     NavTab("Overview", Lucide.LayoutDashboard),
     NavTab("Properties", Lucide.Building2),
+    NavTab("Rooms", Lucide.DoorOpen),
+    NavTab("Tenants", Lucide.Users)
+)
+
+/**
+ * The web's sidebar, in its order and words. The first four open the tabs above;
+ * the rest have no screen in the app yet, so (like the web's placeholders) they do nothing.
+ */
+val LandlordMenu = listOf(
+    NavTab("Dashboard", Lucide.LayoutDashboard),
+    NavTab("Properties", Lucide.Building2),
+    NavTab("Rooms", Lucide.DoorOpen),
     NavTab("Tenants", Lucide.Users),
-    NavTab("Profile", Lucide.User)
+    NavTab("Rent Collection", Lucide.WalletCards, placeholder = true),
+    NavTab("Rent History", Lucide.History, placeholder = true),
+    NavTab("Rent Settings", Lucide.SlidersHorizontal, placeholder = true),
+    NavTab("Expenses", Lucide.Receipt, placeholder = true),
+    NavTab("Reports", Lucide.ChartColumn, placeholder = true),
+    NavTab("Settings", Lucide.Settings, placeholder = true)
 )
 
 /** Top bar and bottom tabs for one signed-in role, so every screen builds them the same way. */
@@ -59,6 +77,7 @@ class Shell(
         if (showNotifications) NotificationsSheet(role, onDismiss = { showNotifications = false })
     }
 
+    /** [selected] is the tab to highlight, or -1 for none (Profile is not a tab). */
     @Composable
     fun BottomNav(selected: Int) {
         RfBottomNav(tabs = if (role == UserRole.Tenant) TenantTabs else LandlordTabs, selected = selected, onSelect = onTab)

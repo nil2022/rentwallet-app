@@ -52,7 +52,7 @@ import com.thebackendguy.rentflow.push.Notifications
 import com.thebackendguy.rentflow.ui.components.AppDrawer
 import com.thebackendguy.rentflow.ui.components.SystemBars
 import com.thebackendguy.rentflow.ui.components.ToastHost
-import com.thebackendguy.rentflow.ui.screens.LandlordTabs
+import com.thebackendguy.rentflow.ui.screens.LandlordMenu
 import com.thebackendguy.rentflow.ui.screens.Shell
 import com.thebackendguy.rentflow.ui.screens.TenantTabs
 import com.thebackendguy.rentflow.ui.screens.auth.ForgotPasswordScreen
@@ -69,6 +69,7 @@ import com.thebackendguy.rentflow.ui.screens.landlord.PropertyDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.PropertyFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomFormScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.RoomsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantsScreen
@@ -87,7 +88,7 @@ import kotlinx.coroutines.launch
 private enum class Screen {
     Login, ForgotPassword, Register,
     TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
-    LandlordOverview, Properties, PropertyDetails, PropertyForm, RoomDetails, RoomForm,
+    LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
     Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, LandlordProfile, EditProfile, ChangePassword
 }
 
@@ -104,7 +105,7 @@ private val StackSaver = listSaver<List<Route>, String>(save = { stack -> stack.
 
 private val AuthScreens = setOf(Screen.Login, Screen.ForgotPassword, Screen.Register)
 private val TenantTabScreens = listOf(Screen.TenantHome, Screen.PaymentHistory, Screen.TenantProfile)
-private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Tenants, Screen.LandlordProfile)
+private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Rooms, Screen.Tenants)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -245,13 +246,15 @@ private fun RentFlowApp() {
 
     val user = session?.user
     val tabScreens = if (role == UserRole.Tenant) TenantTabScreens else LandlordTabScreens
+    // A tenant's Profile is their last tab; a landlord's opens from the photo and the menu, as on the web
+    val profileScreen = if (role == UserRole.Tenant) Screen.TenantProfile else Screen.LandlordProfile
     val shell = Shell(
         role = role,
         name = user?.name.orEmpty(),
         photo = user?.photo,
         unread = unread,
         onMenu = { scope.launch { drawerState.open() } },
-        onProfile = { openTab(tabScreens.last()) },
+        onProfile = { openTab(profileScreen) },
         onTab = { openTab(tabScreens[it]) }
     )
 
@@ -264,18 +267,19 @@ private fun RentFlowApp() {
                 drawerContent = {
                     val tenant = role == UserRole.Tenant
                     AppDrawer(
-                        tabs = if (tenant) TenantTabs else LandlordTabs,
+                        tabs = if (tenant) TenantTabs else LandlordMenu,
                         selected = tabScreens.indexOf(route.screen).takeIf { it >= 0 },
                         tagline = if (tenant) "Tenant" else "Property Manager",
                         name = user?.name.orEmpty(),
                         roleLabel = if (tenant) "Tenant" else "Owner",
                         photo = user?.photo,
                         onSelect = { index ->
-                            openTab(tabScreens[index])
+                            // The menu's placeholder entries can't be tapped, so every index here has a screen
+                            tabScreens.getOrNull(index)?.let(::openTab)
                             scope.launch { drawerState.close() }
                         },
                         onProfile = {
-                            openTab(tabScreens.last())
+                            openTab(profileScreen)
                             scope.launch { drawerState.close() }
                         },
                         onLogout = {
@@ -389,6 +393,13 @@ private fun RentFlowApp() {
                             onDeleted = ::back
                         )
 
+                        Screen.Rooms -> RoomsScreen(
+                            shell = shell,
+                            onOpenRoom = { go(Screen.RoomDetails, it) },
+                            onAssign = { go(Screen.AssignRoom, it) },
+                            onAddRoom = { go(Screen.RoomForm, it) }
+                        )
+
                         // a = property id when editing
                         Screen.PropertyForm -> PropertyFormScreen(
                             propertyId = a,
@@ -400,6 +411,8 @@ private fun RentFlowApp() {
                         // a = room id
                         Screen.RoomDetails -> RoomDetailsScreen(
                             roomId = a.orEmpty(),
+                            // Opened from the Rooms tab it stays lit; from a property, Properties does
+                            tab = if (stack.any { it.screen == Screen.Rooms }) 2 else 1,
                             shell = shell,
                             onBack = ::back,
                             onEdit = { go(Screen.RoomForm, null, a) },

@@ -214,7 +214,8 @@ fun RfTopBar(
 
 /* ------------------------------ Bottom navigation ------------------------------ */
 
-data class NavTab(val label: String, val icon: LucideIcon)
+/** A tab or side-menu entry. A [placeholder] entry is shown, as on the web, but has no screen yet: tapping it does nothing. */
+data class NavTab(val label: String, val icon: LucideIcon, val placeholder: Boolean = false)
 
 /** Bottom tab bar with the Material 3 pill indicator (the web's MobileBottomNav). */
 @Composable

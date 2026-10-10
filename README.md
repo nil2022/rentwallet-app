@@ -59,6 +59,8 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | <img src="docs/screenshots/16-properties.png" width="220" alt="Properties"> | <img src="docs/screenshots/17-property-details.png" width="220" alt="Property details"> | <img src="docs/screenshots/18-property-form.png" width="220" alt="Add property"> |
 | Rooms, let and vacant counts, then a card per property with its cover photo and how many rooms are let. | Swipeable photos, address, floors, parking and lift, and every room with its tenant or “Vacant”. | The web form’s fields in short sections, with chips, switches and up to 10 photos. Mistakes show under the field. |
 
+**26 Rooms tab** (no screenshot yet; [design mockup](https://claude.ai/artifact/2pPTYU1YF9Za16gYADb2PN)). The web’s phone room list: a Property dropdown, then the property’s cover, Monthly target, Total units, Full units and Units with space. Search by room number, type or size, and a Filters sheet with Status (All, Has space, Full) and Floor, each with its count; filters that are on show as chips you can tap off. Every room of the property is in one scroll (the web pages them ten at a time). Each card shows Empty, “1 of 2 filled”, Full or “3 tenants • shared”, the rent, swipeable photos, capacity bars, who lives there with a call button, features and the deposit, and “Assign Tenant” while the room has space. The tab remembers the property while the app runs.
+
 | 19 Room: let | 19 Room: vacant | 20 Add or Edit Room |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/19-room-let.png" width="220" alt="Room with a tenant"> | <img src="docs/screenshots/19-room-vacant.png" width="220" alt="Vacant room"> | <img src="docs/screenshots/20-room-form.png" width="220" alt="Add room"> |
@@ -125,7 +127,11 @@ flowchart TD
     subgraph Landlord
         LO["09 Overview"] -->|"Properties tab"| PL["16 Properties"]
         LO -->|"Tenants tab"| TS["10 Tenants"]
-        LO -->|"Profile tab"| LP["12 Profile"]
+        LO -->|"Rooms tab"| RM["26 Rooms"]
+        LO -->|"Your photo or the menu card"| LP["12 Profile"]
+        RM -->|"Tap a room"| RD
+        RM -->|"Assign Tenant"| AR
+        RM -->|"Add room"| RF
         PL -->|"Tap a property"| PD["17 Property Details"]
         PL -->|"Add property"| PF["18 Property form"]
         PD -->|"Edit property"| PF
@@ -144,15 +150,15 @@ flowchart TD
         LP -->|"Change password"| CP["25 Change Password"]
     end
 
-    TP -->|"Log out"| W
-    LP -->|"Log out"| W
+    TP -->|"Log out"| L
+    LP -->|"Log out"| L
 ```
 
 How navigation works:
 
-- **Bottom tabs.** Tenants have Home, Payments and Profile. Landlords have Overview, Properties, Tenants and Profile.
+- **Bottom tabs.** Tenants have Home, Payments and Profile. Landlords have Overview, Properties, Rooms and Tenants, as on the web; Payments joins them once the rent collection screens are built. A room opened from the Rooms tab keeps Rooms lit, and from a property keeps Properties lit. A landlord’s Profile is not a tab: it opens from your photo in the top bar or your card in the side drawer.
 - **Top bar.** The menu button opens the side drawer. The bell shows how many notifications are unread and opens them in a bottom sheet, the moon/sun button switches the theme, and your photo opens Profile. Inner screens show a back arrow and the screen title.
-- **Side drawer.** As on the web: 260 dp wide (at most 85% of the screen) and navy in both themes, with the logo, the same tabs as the bottom bar, and a card with your photo, name and role that opens Profile. Log out is the icon on that card.
+- **Side drawer.** As on the web: 260 dp wide (at most 85% of the screen) and navy in both themes, with the logo, the menu, and a card with your photo, name and role that opens Profile. Log out is the icon on that card. A landlord’s menu is the web sidebar: Dashboard, Properties, Rooms and Tenants open those tabs; Rent Collection, Rent History, Rent Settings, Expenses, Reports and Settings are listed as on the web but do nothing yet. A tenant’s menu is their three tabs.
 - **Back button.** Screens form a stack, so Back returns to the screen you came from. A tab goes back to the home screen; on a home screen or Login, Back leaves the app.
 - **Staying signed in.** With “Remember for 30 days”, the app opens signed in next time. Without it, the session ends when the app closes. If the server rejects the saved session, the app returns to login and says why.
 
@@ -163,6 +169,7 @@ How navigation works:
 | Login, OTP, Forgot password, Register | Everything | None |
 | Landlord Overview | Property, tenant, vacant-room and rooms-with-space counts, the first three property cards | Payment ledger, sub-meter card |
 | Properties, property details, rooms | Everything: list, details, add, edit, delete, photos | None |
+| Rooms tab | Everything: the property’s rooms, who lives in each, counts, filters | None |
 | Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room | Paid / Due badges, rent status, tenant alerts, Send reminder |
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |

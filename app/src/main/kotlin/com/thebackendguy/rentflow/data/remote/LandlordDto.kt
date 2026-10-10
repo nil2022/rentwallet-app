@@ -24,6 +24,7 @@ data class PropertyDto(
     val hasParking: Boolean = false,
     val hasLift: Boolean = false,
     val description: String? = null,
+    val isActive: Boolean = true,
     val images: List<ImageDto> = emptyList()
 )
 

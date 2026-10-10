@@ -79,7 +79,7 @@ fun LandlordProfileScreen(
     val percent = if (demo.isEmpty()) 0 else paid.size * 100 / demo.size
     val propertyCount = portfolio?.properties?.size
 
-    AppPage(topBar = { shell.TopBar("Profile") }, bottomBar = { shell.BottomNav(3) }) {
+    AppPage(topBar = { shell.TopBar("Profile") }, bottomBar = { shell.BottomNav(-1) }) {
         RfCard(onClick = onEditProfile) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 PersonAvatar(user?.name.orEmpty(), user?.photo, size = 64.dp)

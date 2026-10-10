@@ -126,7 +126,7 @@ fun TenantsScreen(shell: Shell, onOpenTenant: (String) -> Unit, onAddTenant: () 
     Box(Modifier.fillMaxSize()) {
         AppPage(
             topBar = { shell.TopBar("Tenants", chip = state.data?.let { "${it.properties.size} properties" }) },
-            bottomBar = { shell.BottomNav(2) }
+            bottomBar = { shell.BottomNav(3) }
         ) {
             PortfolioContent(state) { portfolio ->
                 val tenants = portfolio.tenants
@@ -282,7 +282,7 @@ fun TenantDetailsScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
-    AppPage(topBar = { shell.TopBar(tenant?.fullName ?: "Tenant", onBack = onBack) }, bottomBar = { shell.BottomNav(2) }) {
+    AppPage(topBar = { shell.TopBar(tenant?.fullName ?: "Tenant", onBack = onBack) }, bottomBar = { shell.BottomNav(3) }) {
         PortfolioContent(state) { portfolio ->
             if (tenant == null) {
                 NotFound("Tenant", onBack)

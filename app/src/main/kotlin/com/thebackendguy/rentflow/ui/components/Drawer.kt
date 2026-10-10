@@ -128,7 +128,7 @@ private fun DrawerItem(tab: NavTab, active: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 3.dp)
             .fillMaxWidth()
             .heightIn(min = 42.dp)
-            .pressable(if (active) null else onClick, pressScale = 0.98f)
+            .pressable(if (active || tab.placeholder) null else onClick, pressScale = 0.98f)
             .then(if (active) Modifier.softShadow(shape, elevation = 6.dp, color = Rf.Logo.copy(alpha = 0.35f)) else Modifier)
             .clip(shape)
             .background(if (active) Rf.Logo else Color.Transparent)

@@ -27,6 +27,9 @@ fun roomCapacity(type: String?): Int? = when (type) {
     else -> 1
 }
 
+/** Whether [tenants] fill a room of this type; a shared room never fills up. */
+fun roomFull(type: String?, tenants: Int): Boolean = roomCapacity(type)?.let { tenants >= it } ?: false
+
 /** "1 of 2 tenants", or "3 tenants" in a shared room. */
 fun occupancyCount(type: String?, tenants: Int): String {
     val capacity = roomCapacity(type)
