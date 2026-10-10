@@ -186,12 +186,13 @@ object LandlordStore {
 
     /**
      * [photo] is null to keep the current photo, [Photo.Picked] to replace it,
-     * and [removePhoto] clears it.
+     * and [removePhoto] clears it. A blank [email] leaves the saved one as it is.
      */
     suspend fun updateTenant(
         context: Context,
         id: String,
         name: String,
+        email: String,
         mobile: String,
         active: Boolean,
         photo: Photo.Picked?,
@@ -205,7 +206,7 @@ object LandlordStore {
             removePhoto -> ""
             else -> null
         }
-        apiCall { api.updateTenant(TenantUpdateBody(id, name, mobile, active, key)) }.discard()
+        apiCall { api.updateTenant(TenantUpdateBody(id, name, email.trim().lowercase().ifBlank { null }, mobile, active, key)) }.discard()
     }
 
     suspend fun deleteTenant(id: String): ApiResult<Unit> = change { apiCall { api.deleteTenant(id) }.discard() }

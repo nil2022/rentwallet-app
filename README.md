@@ -69,7 +69,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 21 Add tenant: details | 21 Add tenant: room | 22 Edit Tenant | 23 Assign Room |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/21-add-tenant-details.png" width="160" alt="Add tenant, step 1"> | <img src="docs/screenshots/21-add-tenant-room.png" width="160" alt="Add tenant, step 2"> | <img src="docs/screenshots/22-edit-tenant.png" width="160" alt="Edit tenant"> | <img src="docs/screenshots/23-assign-room.png" width="160" alt="Assign room"> |
-| Name, mobile, sign-in email, initial password and an optional photo. | Pick a property, then a room with space. Rent and deposit are the room’s. The room can be skipped. The same screen changes a tenant’s room. | Name, mobile, photo and whether the account is active. The email is locked. | From a room with space: a tenant without a room, or a new one. |
+| Name, mobile, an optional email, initial password and an optional photo. A mobile or email already in use is named in the error. | Pick a property, then a room with space. Rent and deposit are the room’s. The room can be skipped. The same screen changes a tenant’s room. | Name, mobile, email, photo and whether the account is active. A saved email can be changed but not removed. | From a room with space: a tenant without a room, or a new one. |
 
 ### Profile settings
 

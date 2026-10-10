@@ -67,7 +67,7 @@ import com.thebackendguy.rentflow.ui.components.softShadow
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.screens.Shell
-import com.thebackendguy.rentflow.ui.screens.auth.emailError
+import com.thebackendguy.rentflow.ui.screens.auth.optionalEmailError
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 import kotlinx.coroutines.launch
@@ -142,13 +142,13 @@ private fun AddTenantFlow(
 
     val nameErr = if (submitted && name.trim().length < 2) "Enter the tenant’s full name" else null
     val mobileErr = if (submitted && !isValidMobile(mobile)) "Enter a valid 10-digit mobile number" else null
-    val emailErr = if (submitted) emailError(email) else null
+    val emailErr = if (submitted) optionalEmailError(email) else null
     val passwordErr = if (submitted && password.length < 6) "Use at least 6 characters" else null
 
     /** Creates the account if it doesn't exist yet; returns its id. */
     suspend fun ensureTenant(): String? {
         createdId?.let { return it }
-        val result = LandlordStore.addTenant(context, NewTenantBody(name.trim(), email.trim().lowercase(), mobile, password, null), photo)
+        val result = LandlordStore.addTenant(context, NewTenantBody(name.trim(), email.trim().lowercase().ifBlank { null }, mobile, password, null), photo)
         return when (result) {
             is ApiResult.Ok -> result.value.also { createdId = it }
             is ApiResult.Fail -> {
@@ -204,7 +204,7 @@ private fun AddTenantFlow(
 
     fun next() {
         submitted = true
-        if (step == Step.Tenant && (name.trim().length < 2 || !isValidMobile(mobile) || emailError(email) != null || password.length < 6)) return
+        if (step == Step.Tenant && (name.trim().length < 2 || !isValidMobile(mobile) || optionalEmailError(email) != null || password.length < 6)) return
         if (lastStep) {
             finish()
             return
@@ -251,9 +251,9 @@ private fun AddTenantFlow(
                         icon = Lucide.Phone, placeholder = "98765 43210", prefix = "+91", keyboardType = KeyboardType.Number, error = mobileErr
                     )
                     RfTextField(
-                        label = "Email address", value = email, onValueChange = { email = it.trim() }, icon = Lucide.Mail,
+                        label = "Email address (optional)", value = email, onValueChange = { email = it.trim() }, icon = Lucide.Mail,
                         placeholder = "priya.mehta@example.com", keyboardType = KeyboardType.Email, error = emailErr,
-                        hint = "The tenant signs in with this email. It can’t be changed later."
+                        hint = "Without an email the tenant signs in with their mobile number."
                     )
                     RfTextField(
                         label = "Initial password", value = password, onValueChange = { password = it }, icon = Lucide.Lock,

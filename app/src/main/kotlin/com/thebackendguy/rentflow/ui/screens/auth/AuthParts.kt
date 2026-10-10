@@ -42,6 +42,9 @@ fun emailError(email: String): String? = when {
     else -> null
 }
 
+/** For an email that may be left blank (a tenant's): only a filled-in one is checked. */
+fun optionalEmailError(email: String): String? = if (email.isBlank()) null else emailError(email)
+
 fun newPasswordError(password: String): String? = when {
     password.isEmpty() -> "Password is required"
     password.length < 8 || password.none(Char::isUpperCase) || password.none(Char::isLowerCase) ||

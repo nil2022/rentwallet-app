@@ -81,6 +81,7 @@ import com.thebackendguy.rentflow.ui.components.rememberPhotoLoad
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.screens.Shell
+import com.thebackendguy.rentflow.ui.screens.auth.optionalEmailError
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 import kotlinx.coroutines.launch
@@ -133,7 +134,7 @@ fun TenantsScreen(shell: Shell, onOpenTenant: (String) -> Unit, onAddTenant: () 
                     EmptyState(
                         icon = Lucide.Users,
                         title = "No tenants yet",
-                        message = "Add a tenant and give them a room. They sign in with the email you add.",
+                        message = "Add a tenant and give them a room. They sign in with their mobile number, or their email if you add one.",
                         actionLabel = "Add tenant",
                         actionIcon = Lucide.UserPlus,
                         onAction = onAddTenant
@@ -307,7 +308,7 @@ fun TenantDetailsScreen(
                     IconRows(
                         listOf(
                             IconDetail(Lucide.Phone, "Mobile", mobileLabel(tenant.mobile) ?: "Not added"),
-                            IconDetail(Lucide.Mail, "Email", tenant.email)
+                            IconDetail(Lucide.Mail, "Email", tenant.email.ifBlank { "Not added" })
                         )
                     )
                 }
@@ -442,6 +443,7 @@ private fun EditTenantForm(tenant: TenantDto, shell: Shell, onBack: () -> Unit, 
     val scope = rememberCoroutineScope()
     var name by rememberSaveable { mutableStateOf(tenant.fullName) }
     var mobile by rememberSaveable { mutableStateOf(mobileDigits(tenant.mobile)) }
+    var email by rememberSaveable { mutableStateOf(tenant.email) }
     var active by rememberSaveable { mutableStateOf(tenant.isActive) }
     var picked by rememberSaveable { mutableStateOf<Uri?>(null) }
     var removed by rememberSaveable { mutableStateOf(false) }
@@ -450,14 +452,15 @@ private fun EditTenantForm(tenant: TenantDto, shell: Shell, onBack: () -> Unit, 
 
     val nameErr = if (submitted && name.trim().length < 2) "Enter the tenant’s full name" else null
     val mobileErr = if (submitted && !isValidMobile(mobile)) "Enter a valid 10-digit mobile number" else null
+    val emailErr = if (submitted) optionalEmailError(email) else null
 
     fun save() {
         submitted = true
-        if (name.trim().length < 2 || !isValidMobile(mobile)) return
+        if (name.trim().length < 2 || !isValidMobile(mobile) || optionalEmailError(email) != null) return
         if (saving) return
         saving = true
         scope.launch {
-            val result = LandlordStore.updateTenant(context, tenant.id, name.trim(), mobile, active, picked?.let { Photo.Picked(it) }, removed)
+            val result = LandlordStore.updateTenant(context, tenant.id, name.trim(), email, mobile, active, picked?.let { Photo.Picked(it) }, removed)
             saving = false
             if (result.announce("Tenant saved")) onSaved()
         }
@@ -489,8 +492,11 @@ private fun EditTenantForm(tenant: TenantDto, shell: Shell, onBack: () -> Unit, 
                 icon = Lucide.Phone, placeholder = "98765 43210", prefix = "+91", keyboardType = KeyboardType.Number, error = mobileErr
             )
             RfTextField(
-                label = "Email address", value = tenant.email, onValueChange = {}, icon = Lucide.Mail, placeholder = "",
-                enabled = false, hint = "The email can’t be changed after the tenant is added."
+                label = "Email address (optional)", value = email, onValueChange = { email = it.trim() }, icon = Lucide.Mail,
+                placeholder = "priya.mehta@example.com", keyboardType = KeyboardType.Email, error = emailErr,
+                // As on the web: the API can change a saved email but not remove it
+                hint = if (tenant.email.isNotBlank()) "A saved email can be changed but not removed."
+                else "Without an email the tenant signs in with their mobile number."
             )
         }
         FormSection(Lucide.ShieldCheck, "Account") {

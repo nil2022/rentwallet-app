@@ -125,19 +125,22 @@ data class RoomBody(
     val images: List<String>
 )
 
+/** A tenant's email is optional: null leaves it out (the tenant signs in with their mobile). */
 @Serializable
 data class NewTenantBody(
     val fullName: String,
-    val email: String,
+    val email: String?,
     val mobile: String,
     val password: String,
     val profilePic: String?
 )
 
+/** [email] null means no change: the API can change a saved email but not remove it. */
 @Serializable
 data class TenantUpdateBody(
     val tenantId: String,
     val fullName: String,
+    val email: String?,
     val mobile: String,
     val isActive: Boolean,
     val profilePic: String?
