@@ -64,14 +64,14 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 19 Room: let | 19 Room: vacant | 20 Add or Edit Room |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/19-room-let.png" width="220" alt="Room with a tenant"> | <img src="docs/screenshots/19-room-vacant.png" width="220" alt="Vacant room"> | <img src="docs/screenshots/20-room-form.png" width="220" alt="Add room"> |
-| Who lives there (“1 of 2 tenants”), each with “Remove from room”. A room with space offers “Assign another tenant”. | A vacant room offers “Assign tenant”. | Room number, floor, occupancy, rent, deposit, facilities and photos. |
+| The web’s room page (screenshot is the older design, [new mockup](https://claude.ai/artifact/ADQYehGDjWwaNptkNe6RED)): room number, property, floor and size with Empty / “1 of 2 filled” / Full; occupancy and amenity chips; Monthly Rent and Security Deposit; Edit Room and Delete. Then the Room Gallery (swipe, thumbnails, full screen), Occupants with capacity bars, Call and Remove on each person, Room Details tiles and the Property with “View Property”. | A room with space offers “Assign Tenant”; a full one says “Room is full. Remove someone to make space.” A room with tenants can’t be deleted until they are removed. | Room number, floor, occupancy, rent, deposit, facilities and photos. |
 
 ### Adding tenants and giving them rooms
 
 | 21 Add tenant: details | 21 Add tenant: room | 22 Edit Tenant | 23 Assign Room |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/21-add-tenant-details.png" width="160" alt="Add tenant, step 1"> | <img src="docs/screenshots/21-add-tenant-room.png" width="160" alt="Add tenant, step 2"> | <img src="docs/screenshots/22-edit-tenant.png" width="160" alt="Edit tenant"> | <img src="docs/screenshots/23-assign-room.png" width="160" alt="Assign room"> |
-| Name, mobile, an optional email, initial password and an optional photo. A mobile or email already in use is named in the error. | Pick a property, then a room with space. Rent and deposit are the room’s. The room can be skipped. The same screen changes a tenant’s room. | Name, mobile, email, photo and whether the account is active. A saved email can be changed but not removed. | From a room with space: a tenant without a room, or a new one. |
+| Name, mobile, an optional email, initial password and an optional photo. A mobile or email already in use is named in the error. | Pick a property, then a room with space. Rent and deposit are the room’s. The room can be skipped. The same screen changes a tenant’s room. | Name, mobile, email, photo and whether the account is active. A saved email can be changed but not removed. | The web’s Assign Tenant dialog: the room and its rent, then “Existing tenant” (search the tenants without a room) or “Create new tenant” (name, mobile, optional email; the password starts as Tenant@123), and “Assign to Room …”. |
 
 ### Profile settings
 
@@ -140,10 +140,10 @@ flowchart TD
         RD -->|"Edit room"| RF
         RD -->|"Assign tenant"| AR["23 Assign Room"]
         RD -->|"Tap the tenant"| TD["11 Tenant Details"]
+        RD -->|"View Property"| PD
         TS -->|"Tap a tenant"| TD
         TS -->|"Add tenant"| AT["21 Add tenant: details, room"]
         LO -->|"Add tenant"| AT
-        AR -->|"Add a new tenant"| AT
         TD -->|"Edit"| TF["22 Edit Tenant"]
         TD -->|"Assign or change room"| AT
         LP -->|"Edit"| EP["24 Edit Profile"]

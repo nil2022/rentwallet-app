@@ -55,7 +55,6 @@ import com.thebackendguy.rentflow.ui.components.Caption
 import com.thebackendguy.rentflow.ui.components.FormBar
 import com.thebackendguy.rentflow.ui.components.FormSection
 import com.thebackendguy.rentflow.ui.components.InfoCard
-import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.SectionHead
@@ -71,6 +70,17 @@ import com.thebackendguy.rentflow.ui.screens.auth.optionalEmailError
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 import kotlinx.coroutines.launch
+import com.thebackendguy.rentflow.ui.components.PrimaryButton
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.animation.core.animateDpAsState
 
 /* ------------------------------ Add tenant, or give one a room ------------------------------ */
 
@@ -421,87 +431,259 @@ private fun RoomOption(room: RoomDto, occupants: Int, selected: Boolean, modifie
     }
 }
 
-/* ------------------------------ Assign a room with space ------------------------------ */
+/* ------------------------------ Assign a tenant to a room ------------------------------ */
 
-/** From a room with space: pick a tenant without a room, or add a new one. */
+/** The web dialog's two ways to fill a room. */
+private enum class AssignMode(val label: String) { Existing("Existing tenant"), New("Create new tenant") }
+
+/** A tenant created here starts with this password, as on the web; they change it after signing in. */
+private const val TEMP_PASSWORD = "Tenant@123"
+
+/**
+ * The web's Assign Tenant dialog as a screen: the room, then either a tenant who
+ * has no room yet or a new one (name, mobile, optional email), and one button.
+ */
 @Composable
-fun AssignRoomScreen(roomId: String, shell: Shell, onBack: () -> Unit, onNewTenant: () -> Unit, onDone: () -> Unit) {
-    val state = portfolioState()
-    val room = state.data?.room(roomId)
+fun AssignRoomScreen(roomId: String, shell: Shell, onBack: () -> Unit, onDone: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val state = portfolioState()
+    val portfolio = state.data
+    val room = portfolio?.room(roomId)
+
+    var mode by rememberSaveable { mutableIntStateOf(AssignMode.Existing.ordinal) }
+    var query by rememberSaveable { mutableStateOf("") }
     var tenantId by rememberSaveable { mutableStateOf<String?>(null) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var mobile by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var submitted by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    val creating = mode == AssignMode.New.ordinal
+
+    val nameErr = if (submitted && creating && name.trim().length < 2) "Enter the tenant’s full name" else null
+    val mobileErr = if (submitted && creating && !isValidMobile(mobile)) "Enter a valid 10-digit mobile number" else null
+    val emailErr = if (submitted && creating) optionalEmailError(email) else null
 
     fun assign() {
         val target = room ?: return
-        val tenant = state.data?.tenant(tenantId)
-        if (tenant == null) {
-            Toasts.error("Choose a tenant, or add a new one.")
+        if (saving) return
+        if (!creating) {
+            val tenant = portfolio?.tenant(tenantId)
+            if (tenant == null) {
+                Toasts.error("Pick a tenant to assign.")
+                return
+            }
+            saving = true
+            scope.launch {
+                val done = LandlordStore.assignRoom(tenant.id, target.id).announce("${tenant.fullName} is now in Room ${target.roomNumber}")
+                saving = false
+                if (done) onDone()
+            }
             return
         }
-        if (saving) return
+
+        submitted = true
+        if (name.trim().length < 2 || !isValidMobile(mobile) || optionalEmailError(email) != null) return
+        val newName = name.trim()
         saving = true
         scope.launch {
-            val done = LandlordStore.assignRoom(tenant.id, target.id).announce("${tenant.fullName} is now in Room ${target.roomNumber}")
+            // A brand new tenant needs an account before they can be put in a room
+            val body = NewTenantBody(newName, email.trim().lowercase().ifBlank { null }, mobile, TEMP_PASSWORD, null)
+            when (val created = LandlordStore.addTenant(context, body, null)) {
+                is ApiResult.Fail -> Toasts.error(created.message)
+                is ApiResult.Ok -> when (val assigned = LandlordStore.assignRoom(created.value, target.id)) {
+                    is ApiResult.Ok -> {
+                        Toasts.show("$newName is now in Room ${target.roomNumber}")
+                        onDone()
+                    }
+                    is ApiResult.Fail -> {
+                        // The account exists now: offer it from the list instead of creating it twice
+                        LandlordStore.finish()
+                        mode = AssignMode.Existing.ordinal
+                        tenantId = created.value
+                        query = ""
+                        submitted = false
+                        Toasts.error("$newName was added, but couldn’t be put in the room: ${assigned.message}")
+                    }
+                }
+            }
             saving = false
-            if (done) onDone()
         }
     }
 
     AppPage(
-        topBar = { shell.TopBar(room?.let { "Assign Room ${it.roomNumber}" } ?: "Assign Room", onBack = onBack) },
-        bottomBar = if (room != null) ({ FormBar("Assign to Room ${room.roomNumber}", ::assign, loading = saving) }) else null
+        topBar = { shell.TopBar("Assign Tenant", onBack = onBack) },
+        bottomBar = if (room != null) ({
+            AssignFooter(portfolio?.property(room.propertyId)?.propertyName, "Assign to Room ${room.roomNumber}", saving, ::assign)
+        }) else null
     ) {
-        PortfolioContent(state) { portfolio ->
+        PortfolioContent(state) { data ->
             if (room == null) {
                 NotFound("Room", onBack)
                 return@PortfolioContent
             }
-            RoomSummary(portfolio, room, "Room ${room.roomNumber} • ${occupancyCount(room.occupancyType, portfolio.occupants(room.id).size)}")
-            val waiting = portfolio.tenantsWithoutRoom
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionHead("Tenants without a room") { Caption("${waiting.size} found") }
-                if (waiting.isEmpty()) {
-                    Text("Every tenant already has a room.", style = RfType.BodyMd, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(4.dp))
+            AssignRoomSummary(room)
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Rf.PrimaryFixed), contentAlignment = Alignment.Center) {
+                        LIcon(Lucide.UserRound, size = 16.dp, tint = Rf.Primary)
+                    }
+                    Text("Tenant", style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
                 }
-                waiting.forEach { tenant ->
-                    TenantOption(tenant, tenant.id == tenantId) { tenantId = tenant.id }
-                }
-                RfCard(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp), onClick = onNewTenant) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.size(40.dp).clip(CircleShape).background(Rf.Low), contentAlignment = Alignment.Center) {
-                            LIcon(Lucide.UserPlus, size = 18.dp, tint = Rf.Primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssignMode.entries.forEach { option ->
+                        ModeButton(option.label, mode == option.ordinal, Modifier.weight(1f)) {
+                            mode = option.ordinal
+                            submitted = false
                         }
-                        Column(Modifier.weight(1f)) {
-                            Text("Add a new tenant", style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.Primary)
-                            Text("Create their account and give them this room", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
-                        }
-                        LIcon(Lucide.ChevronRight, tint = Rf.Outline)
                     }
                 }
+
+                if (!creating) {
+                    SearchBox(query, "Search by name, mobile or email") { query = it }
+                    val waiting = data.tenantsWithoutRoom
+                    val q = query.trim()
+                    val shown = waiting.filter { t ->
+                        q.isEmpty() || listOfNotNull(t.fullName, t.mobile, t.email).any { it.contains(q, ignoreCase = true) }
+                    }
+                    if (shown.isEmpty()) {
+                        Text(
+                            when {
+                                waiting.isEmpty() -> "Every tenant is already in a room. Create a new one instead."
+                                else -> "No tenant without a room matches “$q”."
+                            },
+                            style = RfType.BodyMd, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                    shown.forEach { tenant -> TenantOption(tenant, tenant.id == tenantId) { tenantId = tenant.id } }
+                } else {
+                    RfTextField(
+                        label = "Full Name", value = name, onValueChange = { name = it }, icon = Lucide.User,
+                        placeholder = "e.g. Priya Mehta", capitalization = KeyboardCapitalization.Words, error = nameErr
+                    )
+                    RfTextField(
+                        label = "Mobile Number", value = mobile, onValueChange = { mobile = it.filter(Char::isDigit).take(10) },
+                        icon = Lucide.Phone, placeholder = "10-digit mobile", prefix = "+91", keyboardType = KeyboardType.Number, error = mobileErr
+                    )
+                    RfTextField(
+                        label = "Email Address (optional)", value = email, onValueChange = { email = it.trim() }, icon = Lucide.Mail,
+                        placeholder = "tenant@example.com", keyboardType = KeyboardType.Email, error = emailErr
+                    )
+                    Text(
+                        buildAnnotatedString {
+                            append("The tenant is created with the temporary password ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Rf.OnSurface)) { append(TEMP_PASSWORD) }
+                            append(" and is then moved into Room ${room.roomNumber}. They sign in with their mobile number (or email, if added) and can change the password after their first sign-in.")
+                        },
+                        style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium, lineHeight = 17.sp), color = Rf.OnSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Rf.Low).padding(horizontal = 12.dp, vertical = 10.dp)
+                    )
+                }
             }
-            InfoCard(
-                Lucide.IndianRupee, "${inr(room.rent)} a month • ${inr(room.securityDeposit)} deposit",
-                "Rent and deposit are set on the room. Edit the room to change them.", iconColor = Rf.Primary
-            )
+        }
+    }
+}
+
+/** The room the tenant is going into: number, type, size, space, and its rent. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AssignRoomSummary(room: RoomDto) {
+    RfCard(shape = RoundedCornerShape(14.dp), padding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Rf.PrimaryFixed), contentAlignment = Alignment.Center) {
+                LIcon(Lucide.DoorOpen, size = 22.dp, tint = Rf.Primary)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Room ${room.roomNumber}", style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SummaryChip(occupancyLabel(room.occupancyType), Rf.Low, Rf.OnSurfaceVariant)
+                    room.roomSize?.takeIf(String::isNotBlank)?.let { SummaryChip(it, Rf.Low, Rf.OnSurfaceVariant) }
+                    if (room.isAvailable) SummaryChip("Has space", Rf.MintSoft, Rf.Secondary) else SummaryChip("Full", Rf.ErrorContainer, Rf.Error)
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(inr(room.rent), style = RfType.BodyLg.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Primary)
+                Text("/ month, set on the room", style = RfType.LabelSm.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+            }
         }
     }
 }
 
 @Composable
-private fun TenantOption(tenant: TenantDto, selected: Boolean, onClick: () -> Unit) {
-    RfCard(
-        padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-        color = if (selected) Rf.PrimaryFixed.copy(alpha = 0.35f).compositeOverCard() else Rf.Lowest,
-        onClick = onClick
+private fun SummaryChip(text: String, background: Color, content: Color) {
+    Text(
+        text, style = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold), color = content,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(background).padding(horizontal = 7.dp, vertical = 3.dp)
+    )
+}
+
+@Composable
+private fun ModeButton(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val background by animateColorAsState(if (selected) Rf.PrimaryFixed else Rf.Lowest, label = "modeBg")
+    Box(
+        modifier
+            .pressable(onClick, pressScale = 0.97f)
+            .clip(CircleShape)
+            .background(background)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) Rf.Primary else Rf.OutlineVariant, CircleShape)
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PersonAvatar(tenant.fullName, tenant.profilePic, size = 40.dp)
-            Column(Modifier.weight(1f)) {
-                Text(tenant.fullName, style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                Text(mobileLabel(tenant.mobile) ?: tenant.email, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+        Text(label, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = if (selected) Rf.Primary else Rf.OnSurfaceVariant, maxLines = 1)
+    }
+}
+
+/** A tenant without a room (the amber dot), picked like a radio button. */
+@Composable
+private fun TenantOption(tenant: TenantDto, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .pressable(onClick, pressScale = 0.98f)
+            .softShadow(shape)
+            .clip(shape)
+            .background(if (selected) Rf.PrimaryFixed.copy(alpha = 0.35f).compositeOverCard() else Rf.Lowest)
+            .border(1.5.dp, if (selected) Rf.Primary else Color.Transparent, shape)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box {
+            Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Rf.MintSoft), contentAlignment = Alignment.Center) {
+                Text(initials(tenant.fullName), style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
             }
-            LIcon(if (selected) Lucide.CircleCheck else Lucide.Circle, size = 22.dp, tint = if (selected) Rf.Primary else Rf.OutlineVariant)
+            Box(Modifier.align(Alignment.BottomEnd).size(12.dp).clip(CircleShape).background(Rf.Lowest).padding(2.dp).clip(CircleShape).background(Rf.Amber))
         }
+        Column(Modifier.weight(1f)) {
+            Text(tenant.fullName, style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(mobileLabel(tenant.mobile) ?: tenant.email, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+        }
+        val ring by animateDpAsState(if (selected) 6.dp else 2.dp, label = "radio")
+        Box(Modifier.size(20.dp).clip(CircleShape).border(ring, if (selected) Rf.Primary else Rf.OutlineVariant, CircleShape))
+    }
+}
+
+/** The property line and the one button, pinned under the form like the web dialog's footer. */
+@Composable
+private fun AssignFooter(propertyName: String?, label: String, saving: Boolean, onAssign: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RectangleShape, ambientColor = Rf.Shadow, spotColor = Rf.Shadow)
+            .background(Rf.Lowest)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (propertyName != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LIcon(Lucide.Building2, size = 14.dp, tint = Rf.OnSurfaceVariant)
+                Text(propertyName, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        PrimaryButton(label, onClick = onAssign, loading = saving, showArrow = false)
     }
 }

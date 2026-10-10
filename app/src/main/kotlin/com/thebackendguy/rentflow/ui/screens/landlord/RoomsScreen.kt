@@ -269,7 +269,7 @@ private fun MiniStat(label: String, value: String, foot: String, footColor: Colo
 
 /** The web's small uppercase label. */
 @Composable
-private fun Caps(text: String) {
+internal fun Caps(text: String) {
     Text(text.uppercase(), style = RfType.LabelSm.copy(fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp), color = Rf.OnSurfaceVariant)
 }
 
@@ -483,7 +483,7 @@ private fun RoomCard(room: RoomDto, occupants: List<TenantDto>, full: Boolean, o
 
 /** How full the room is, in the web's words and colours. */
 @Composable
-private fun FillPill(type: String?, tenants: Int) {
+internal fun FillPill(type: String?, tenants: Int) {
     val capacity = roomCapacity(type)
     val (text, background, content) = when {
         tenants == 0 -> Triple("Empty", Rf.PrimaryFixed, Rf.Primary)
@@ -522,7 +522,7 @@ private fun OccupantRow(tenant: TenantDto) {
     }
 }
 
-private fun initials(name: String): String =
+internal fun initials(name: String): String =
     name.trim().split(Regex("\\s+")).filter(String::isNotEmpty).take(2).joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
 
 /** Swipeable photos with a counter and dots, or the room placeholder when there are none. */
@@ -554,7 +554,7 @@ private fun CardPhotos(images: List<ImageDto>) {
 }
 
 /** The web's dashed outline for an empty slot. */
-private fun Modifier.dashedBorder(color: Color): Modifier = drawBehind {
+internal fun Modifier.dashedBorder(color: Color): Modifier = drawBehind {
     drawRoundRect(
         color = color,
         style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),

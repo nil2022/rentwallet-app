@@ -1,17 +1,31 @@
 package com.thebackendguy.rentflow.ui.screens.landlord
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.thebackendguy.rentflow.data.FloorOptions
 import com.thebackendguy.rentflow.data.LandlordStore
 import com.thebackendguy.rentflow.data.OccupancyTypes
@@ -38,41 +55,37 @@ import com.thebackendguy.rentflow.data.Photo
 import com.thebackendguy.rentflow.data.Portfolio
 import com.thebackendguy.rentflow.data.floorLabel
 import com.thebackendguy.rentflow.data.inr
+import com.thebackendguy.rentflow.data.mobileDigits
 import com.thebackendguy.rentflow.data.mobileLabel
-import com.thebackendguy.rentflow.data.occupancyCount
 import com.thebackendguy.rentflow.data.occupancyLabel
 import com.thebackendguy.rentflow.data.plainAmount
 import com.thebackendguy.rentflow.data.remote.ApiResult
+import com.thebackendguy.rentflow.data.remote.PropertyDto
 import com.thebackendguy.rentflow.data.remote.RoomBody
 import com.thebackendguy.rentflow.data.remote.RoomDto
 import com.thebackendguy.rentflow.data.remote.TenantDto
-import com.thebackendguy.rentflow.ui.components.ActionButton
+import com.thebackendguy.rentflow.data.roomCapacity
+import com.thebackendguy.rentflow.data.roomFull
 import com.thebackendguy.rentflow.ui.components.AppPage
 import com.thebackendguy.rentflow.ui.components.ChoiceChips
 import com.thebackendguy.rentflow.ui.components.ConfirmSheet
 import com.thebackendguy.rentflow.ui.components.FormBar
 import com.thebackendguy.rentflow.ui.components.FormSection
-import com.thebackendguy.rentflow.ui.components.IconDetail
-import com.thebackendguy.rentflow.ui.components.IconRows
-import com.thebackendguy.rentflow.ui.components.IconTile
-import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.PhotoGrid
 import com.thebackendguy.rentflow.ui.components.PhotoListSaver
-import com.thebackendguy.rentflow.ui.components.Pill
-import com.thebackendguy.rentflow.ui.components.PrimaryButton
+import com.thebackendguy.rentflow.ui.components.PhotoViewer
 import com.thebackendguy.rentflow.ui.components.RemoteImage
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.RowDivider
-import com.thebackendguy.rentflow.ui.components.SectionHead
 import com.thebackendguy.rentflow.ui.components.SelectField
 import com.thebackendguy.rentflow.ui.components.SwitchRow
 import com.thebackendguy.rentflow.ui.components.TextArea
-import com.thebackendguy.rentflow.ui.components.TitledCard
 import com.thebackendguy.rentflow.ui.components.Toasts
 import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
+import com.thebackendguy.rentflow.ui.icons.LucideIcon
 import com.thebackendguy.rentflow.ui.screens.Shell
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
@@ -80,6 +93,7 @@ import kotlinx.coroutines.launch
 
 /* ------------------------------ Room details ------------------------------ */
 
+/** The web's phone room page (RoomDetailView): header, gallery, occupants, details and the property. */
 @Composable
 fun RoomDetailsScreen(
     roomId: String,
@@ -88,6 +102,7 @@ fun RoomDetailsScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenTenant: (String) -> Unit,
+    onOpenProperty: (String) -> Unit,
     onAssign: () -> Unit,
     onDeleted: () -> Unit
 ) {
@@ -99,7 +114,7 @@ fun RoomDetailsScreen(
     val scope = rememberCoroutineScope()
 
     AppPage(topBar = { shell.TopBar(room?.let { "Room ${it.roomNumber}" } ?: "Room", onBack = onBack) }, bottomBar = { shell.BottomNav(tab) }) {
-        PortfolioContent(state, loadingImageHeight = 120.dp) { portfolio ->
+        PortfolioContent(state, loadingImageHeight = 180.dp) { portfolio ->
             if (room == null) {
                 NotFound("Room", onBack)
                 return@PortfolioContent
@@ -108,75 +123,17 @@ fun RoomDetailsScreen(
             val occupants = portfolio.occupants(room.id)
             val let = occupants.isNotEmpty()
 
-            RfCard(padding = PaddingValues(0.dp)) {
-                Box(Modifier.fillMaxWidth().height(120.dp)) {
-                    RemoteImage(room.images.firstOrNull()?.url, Modifier.fillMaxSize(), placeholderIcon = Lucide.DoorOpen)
-                    Pill(
-                        if (let) "Let" else "Vacant", background = Rf.InverseSurface.copy(alpha = 0.8f), content = Rf.InverseOnSurface,
-                        dot = true, dotColor = if (let) Rf.Mint else Color(0xFFC3C0FF),
-                        modifier = Modifier.align(Alignment.TopEnd).padding(10.dp)
-                    )
-                    Column(
-                        Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(6.dp))
-                            .background(Rf.InverseSurface.copy(alpha = 0.85f)).padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text("Monthly rent", style = RfType.LabelSm, color = Rf.InverseOnSurface.copy(alpha = 0.8f))
-                        Text(inr(room.rent), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.Bold), color = Color.White)
-                    }
-                }
-                Column(Modifier.padding(14.dp)) {
-                    Text("Room ${room.roomNumber} • ${floorLabel(room.floor)}", style = RfType.BodyLg.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                    Text(
-                        listOfNotNull(property?.propertyName, occupancyLabel(room.occupancyType)).joinToString(" • "),
-                        style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
-                    )
-                }
-            }
-
-            if (let) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionHead(if (occupants.size == 1) "Tenant" else "Tenants") {
-                        Pill(
-                            occupancyCount(room.occupancyType, occupants.size),
-                            background = if (room.isAvailable) Rf.AmberSoft else Rf.MintSoft,
-                            content = if (room.isAvailable) Rf.Amber else Rf.Secondary
-                        )
-                    }
-                    occupants.forEach { tenant ->
-                        OccupantCard(tenant, onOpen = { onOpenTenant(tenant.id) }, onRemove = { removing = tenant })
-                    }
-                }
-                if (room.isAvailable) {
-                    ActionButton("Assign another tenant", Lucide.UserPlus, Rf.Container, Rf.Primary, Modifier.fillMaxWidth(), onClick = onAssign)
-                }
-            } else {
-                RfCard {
-                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        IconTile(Lucide.DoorOpen, background = Rf.PrimaryFixed, tint = Rf.Primary, size = 48.dp, radius = 14.dp, iconSize = 24.dp)
-                        Text("This room is vacant", style = RfType.BodyLg.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                        Text(
-                            "Assign a tenant to this room. They pay the rent and deposit set on it.",
-                            style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center
-                        )
-                    }
-                    PrimaryButton("Assign tenant", onClick = onAssign, showArrow = false, modifier = Modifier.padding(top = 16.dp))
-                }
-            }
-
-            TitledCard("Room details") {
-                IconRows(roomFacts(room))
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActionButton("Edit room", Lucide.Pencil, Rf.Container, Rf.Primary, Modifier.weight(1f), onClick = onEdit)
-                ActionButton("Delete", Lucide.Trash2, Rf.ErrorContainer, Rf.Error, Modifier.weight(1f)) { confirmDelete = true }
-            }
+            RoomHeaderCard(room, property?.propertyName, occupants.size, onEdit = onEdit, onDelete = { confirmDelete = true })
+            RoomGallery(room)
+            OccupantsCard(room, occupants, onOpenTenant = onOpenTenant, onRemove = { removing = it }, onAssign = onAssign)
+            RoomFactsCard(room)
+            if (property != null) PropertyLinkCard(property) { onOpenProperty(property.id) }
 
             removing?.let { tenant ->
                 ConfirmSheet(
                     icon = Lucide.LogOut,
-                    title = "Remove ${tenant.fullName} from Room ${room.roomNumber}?",
-                    message = "The room gets their place back. ${tenant.fullName}’s account and bills are kept, and you can give them a room again later.",
+                    title = "Remove ${tenant.fullName}?",
+                    message = "Remove ${tenant.fullName} from Room ${room.roomNumber}? The room will have space again. Their account and bills are kept.",
                     confirmLabel = "Remove from room",
                     busy = busy,
                     onConfirm = {
@@ -192,6 +149,8 @@ fun RoomDetailsScreen(
             }
 
             if (confirmDelete) {
+                // The API deletes a room even with tenants in it, leaving them in a room that no
+                // longer exists, so the app asks for the room to be emptied first
                 ConfirmSheet(
                     icon = Lucide.Trash2,
                     title = "Delete room ${room.roomNumber}?",
@@ -219,48 +178,345 @@ fun RoomDetailsScreen(
     }
 }
 
-/** Someone living in the room: tapping them opens the tenant, below is "Remove from room". */
+/** Room number, where it is, how full, what it has, rent and deposit, then Edit and Delete. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OccupantCard(tenant: TenantDto, onOpen: () -> Unit, onRemove: () -> Unit) {
-    RfCard {
-        Row(
-            Modifier.fillMaxWidth().pressable(onOpen, pressScale = 0.98f).padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            PersonAvatar(tenant.fullName, tenant.profilePic, size = 40.dp)
+private fun RoomHeaderCard(room: RoomDto, propertyName: String?, tenants: Int, onEdit: () -> Unit, onDelete: () -> Unit) {
+    // The three built-in features, then the room's own comma-separated amenities, as on the web
+    val amenities = listOfNotNull(
+        "Attached Washroom".takeIf { room.hasAttachedWashroom },
+        "Balcony".takeIf { room.hasBalcony },
+        "Furnished".takeIf { room.isFurnished }
+    ) + room.amenities.orEmpty().split(',', '\n').map(String::trim).filter(String::isNotEmpty)
+
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(18.dp), spacing = 14.dp) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f)) {
-                Text(tenant.fullName, style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface)
-                Text(mobileLabel(tenant.mobile) ?: tenant.email, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+                Text(
+                    "Room ${room.roomNumber}",
+                    style = RfType.HeadlineLg.copy(fontSize = 26.sp, lineHeight = 29.sp, fontWeight = FontWeight.ExtraBold),
+                    color = Rf.OnSurface
+                )
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LIcon(Lucide.Building2, size = 14.dp, tint = Rf.OnSurfaceVariant)
+                    Text(
+                        listOfNotNull(propertyName, floorLabel(room.floor), room.roomSize?.takeIf(String::isNotBlank)).joinToString(" • "),
+                        style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+                    )
+                }
             }
-            LIcon(Lucide.ChevronRight, tint = Rf.Outline)
+            FillPill(room.occupancyType, tenants)
         }
-        HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            HeaderChip(Lucide.Users, "${occupancyLabel(room.occupancyType)} Occupancy", highlight = true)
+            amenities.forEach { HeaderChip(Lucide.CircleCheck, it, highlight = false) }
+        }
         Row(
-            Modifier.fillMaxWidth().pressable(onRemove).padding(top = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+            Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(RoundedCornerShape(14.dp)).background(Rf.Low)
         ) {
-            LIcon(Lucide.LogOut, size = 16.dp, tint = Rf.Error)
-            Text("Remove from room", style = RfType.LabelMd, color = Rf.Error)
+            MoneyCell("Monthly Rent", inr(room.rent), "/ mo", Modifier.weight(1f))
+            Box(Modifier.width(1.dp).fillMaxHeight().background(Rf.OutlineVariant))
+            MoneyCell("Security Deposit", inr(room.securityDeposit), null, Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            WideButton("Edit Room", Lucide.Pencil, Rf.Primary, Rf.OnPrimary, Modifier.weight(1f), onEdit)
+            WideButton("Delete", Lucide.Trash2, Rf.ErrorContainer, Rf.Error, Modifier.weight(1f), onDelete)
         }
     }
 }
 
-private fun roomFacts(room: RoomDto): List<IconDetail> = listOfNotNull(
-    IconDetail(Lucide.Users, "Occupancy", occupancyLabel(room.occupancyType)),
-    IconDetail(Lucide.IndianRupee, "Security deposit", inr(room.securityDeposit)),
-    room.roomSize?.takeIf(String::isNotBlank)?.let { IconDetail(Lucide.Ruler, "Room size", it) },
-    IconDetail(
-        Lucide.Sofa, "Furnished",
-        if (room.isFurnished) room.furnitureDetails?.takeIf(String::isNotBlank) ?: "Yes" else "Not furnished"
-    ),
-    IconDetail(
-        Lucide.Bath, "Washroom • Balcony",
-        "${if (room.hasAttachedWashroom) "Attached" else "Shared"} • ${if (room.hasBalcony) "Balcony" else "No balcony"}"
-    ),
-    room.amenities?.takeIf(String::isNotBlank)?.let { IconDetail(Lucide.Wifi, "Amenities", it) }
-)
+@Composable
+private fun HeaderChip(icon: LucideIcon, label: String, highlight: Boolean) {
+    Row(
+        Modifier.clip(RoundedCornerShape(8.dp)).background(if (highlight) Rf.PrimaryFixed else Rf.Low).padding(horizontal = 9.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        LIcon(icon, size = 13.dp, tint = if (highlight) Rf.Primary else Rf.Secondary)
+        Text(label, style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = if (highlight) Rf.Primary else Rf.OnSurfaceVariant, maxLines = 1)
+    }
+}
+
+@Composable
+private fun MoneyCell(label: String, amount: String, unit: String?, modifier: Modifier) {
+    Column(modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Caps(label)
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(amount, style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, maxLines = 1)
+            if (unit != null) Text(unit, style = RfType.LabelSm, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+        }
+    }
+}
+
+/** The web's 44 dp page button with an icon. */
+@Composable
+private fun WideButton(label: String, icon: LucideIcon, background: Color, content: Color, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier.height(44.dp).pressable(onClick, pressScale = 0.97f).clip(RoundedCornerShape(12.dp)).background(background),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LIcon(icon, size = 16.dp, tint = content)
+        Text(label, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = content, maxLines = 1)
+    }
+}
+
+/** Icon tile and bold title that opens each card on the room page, with an optional [trailing] part. */
+@Composable
+private fun CardTitle(icon: LucideIcon, title: String, trailing: @Composable () -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Rf.PrimaryFixed), contentAlignment = Alignment.Center) {
+            LIcon(icon, size = 16.dp, tint = Rf.Primary)
+        }
+        Text(title, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, modifier = Modifier.weight(1f))
+        trailing()
+    }
+}
+
+/** A big photo to swipe, thumbnails under it, and full screen on a tap. */
+@Composable
+private fun RoomGallery(room: RoomDto) {
+    val images = room.images
+    val scope = rememberCoroutineScope()
+    val pager = rememberPagerState { images.size.coerceAtLeast(1) }
+    var viewing by remember { mutableStateOf<Int?>(null) }
+
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 12.dp) {
+        CardTitle(Lucide.Images, "Room Gallery") {
+            if (images.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("${images.size} ${if (images.size == 1) "photo" else "photos"}", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+                    if (images.size > 1) {
+                        Row(
+                            Modifier.pressable({ viewing = pager.currentPage }),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            LIcon(Lucide.LayoutGrid, size = 14.dp, tint = Rf.Primary)
+                            Text("View all", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
+                        }
+                    }
+                }
+            }
+        }
+        if (images.isEmpty()) {
+            Box(Modifier.fillMaxWidth().aspectRatio(3f / 2f).clip(RoundedCornerShape(12.dp))) {
+                RemoteImage(null, Modifier.fillMaxSize(), placeholderIcon = Lucide.DoorOpen)
+            }
+            Text(
+                "Use Edit Room to upload room photos.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium),
+                color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            Box(Modifier.fillMaxWidth().aspectRatio(3f / 2f).clip(RoundedCornerShape(12.dp))) {
+                HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
+                    RemoteImage(images[page].url, Modifier.fillMaxSize().pressable({ viewing = page }, pressScale = 1f), placeholderIcon = Lucide.DoorOpen)
+                }
+                if (images.size > 1) {
+                    Text(
+                        "${pager.currentPage + 1} / ${images.size}",
+                        style = RfType.LabelSm, color = Color.White,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(CircleShape)
+                            .background(Rf.InverseSurface.copy(alpha = 0.8f)).padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            if (images.size > 1) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    images.forEachIndexed { index, image ->
+                        val active = index == pager.currentPage
+                        Box(
+                            Modifier
+                                .size(width = 58.dp, height = 44.dp)
+                                .pressable({ scope.launch { pager.animateScrollToPage(index) } })
+                                .alpha(if (active) 1f else 0.6f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(if (active) 2.dp else 0.dp, if (active) Rf.Primary else Color.Transparent, RoundedCornerShape(8.dp))
+                        ) {
+                            RemoteImage(image.url, Modifier.fillMaxSize(), placeholderIcon = Lucide.DoorOpen, iconSize = 16.dp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    viewing?.let { start ->
+        PhotoViewer(images.map { Photo.Stored(it.key, it.url) }, start, onClose = { viewing = null })
+    }
+}
+
+/** Who lives in the room: a row each with call and Remove, then Assign while there is space. */
+@Composable
+private fun OccupantsCard(
+    room: RoomDto,
+    occupants: List<TenantDto>,
+    onOpenTenant: (String) -> Unit,
+    onRemove: (TenantDto) -> Unit,
+    onAssign: () -> Unit
+) {
+    val capacity = roomCapacity(room.occupancyType)
+    val full = roomFull(room.occupancyType, occupants.size)
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(18.dp), spacing = 12.dp) {
+        CardTitle(Lucide.Users, "Occupants") { FillPill(room.occupancyType, occupants.size) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (capacity == null) {
+                LIcon(Lucide.Info, size = 14.dp, tint = Rf.OnSurfaceVariant)
+                Text("Shared room: no fixed limit", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    repeat(capacity) { i ->
+                        val on = i < occupants.size
+                        Box(
+                            Modifier.size(width = 26.dp, height = 8.dp).clip(CircleShape)
+                                .background(if (on) Rf.Primary else Rf.Low)
+                                .border(1.dp, if (on) Rf.Primary else Rf.OutlineVariant, CircleShape)
+                        )
+                    }
+                }
+                Text(
+                    "${occupants.size} of $capacity ${if (capacity == 1) "place" else "places"} filled",
+                    style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+                )
+            }
+        }
+        if (occupants.isEmpty()) {
+            Text(
+                "No one lives in this room yet.\nAssign a tenant to fill it.",
+                style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().dashedBorder(Rf.OutlineVariant).padding(14.dp)
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                occupants.forEach { tenant -> OccupantLine(tenant, onOpen = { onOpenTenant(tenant.id) }, onRemove = { onRemove(tenant) }) }
+            }
+        }
+        if (full) {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Rf.Low).padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LIcon(Lucide.Info, size = 15.dp, tint = Rf.OnSurfaceVariant)
+                Text("Room is full. Remove someone to make space.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+            }
+        } else {
+            WideButton("Assign Tenant", Lucide.UserPlus, Rf.Primary, Rf.OnPrimary, Modifier.fillMaxWidth(), onAssign)
+        }
+    }
+}
+
+/** Initials, name and number (tap to open the tenant), a call button and Remove. */
+@Composable
+private fun OccupantLine(tenant: TenantDto, onOpen: () -> Unit, onRemove: () -> Unit) {
+    val context = LocalContext.current
+    val digits = mobileDigits(tenant.mobile)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Row(
+            Modifier.weight(1f).pressable(onOpen, pressScale = 0.98f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Rf.MintSoft), contentAlignment = Alignment.Center) {
+                Text(initials(tenant.fullName), style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    tenant.fullName.ifBlank { "Tenant" }, style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold),
+                    color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                if (digits.isNotEmpty()) Text(mobileLabel(tenant.mobile).orEmpty(), style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+            }
+        }
+        if (digits.isNotEmpty()) {
+            Box(
+                Modifier.size(32.dp)
+                    .pressable({ context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+91$digits"))) })
+                    .clip(RoundedCornerShape(9.dp)).background(Rf.Lowest),
+                contentAlignment = Alignment.Center
+            ) {
+                LIcon(Lucide.Phone, size = 15.dp, tint = Rf.Primary, contentDescription = "Call ${tenant.fullName}")
+            }
+        }
+        Row(
+            Modifier.height(32.dp).pressable(onRemove).clip(RoundedCornerShape(9.dp)).background(Rf.ErrorContainer).padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            LIcon(Lucide.LogOut, size = 13.dp, tint = Rf.Error)
+            Text("Remove", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Error)
+        }
+    }
+}
+
+/** Six facts about the room in two columns, as on the web. */
+@Composable
+private fun RoomFactsCard(room: RoomDto) {
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(18.dp), spacing = 12.dp) {
+        CardTitle(Lucide.DoorOpen, "Room Details")
+        val cells = listOf(
+            Fact(Lucide.Layers, "Floor", floorLabel(room.floor)),
+            Fact(Lucide.Users, "Occupancy", occupancyLabel(room.occupancyType)),
+            Fact(Lucide.Maximize, "Room Size", room.roomSize?.takeIf(String::isNotBlank) ?: "—"),
+            Fact(Lucide.Sofa, "Furnishing", if (room.isFurnished) "Furnished" else "Unfurnished"),
+            Fact(Lucide.Bath, "Washroom", if (room.hasAttachedWashroom) "Attached" else "Shared", yes = room.hasAttachedWashroom),
+            Fact(Lucide.DoorOpen, "Balcony", if (room.hasBalcony) "Yes" else "No", yes = room.hasBalcony)
+        )
+        cells.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { FactCell(it, Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** [yes] null is a plain value; true / false colour it as the web does for Washroom and Balcony. */
+private data class Fact(val icon: LucideIcon, val label: String, val value: String, val yes: Boolean? = null)
+
+@Composable
+private fun FactCell(fact: Fact, modifier: Modifier) {
+    Row(
+        modifier.clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(Rf.Lowest), contentAlignment = Alignment.Center) {
+            LIcon(fact.icon, size = 14.dp, tint = Rf.Primary)
+        }
+        Column(Modifier.weight(1f)) {
+            Caps(fact.label)
+            Text(
+                fact.value,
+                style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold),
+                color = when (fact.yes) {
+                    true -> Rf.Secondary
+                    false -> Rf.OnSurfaceVariant
+                    null -> Rf.OnSurface
+                },
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** The room's property, with a button to open it. */
+@Composable
+private fun PropertyLinkCard(property: PropertyDto, onOpen: () -> Unit) {
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(18.dp), spacing = 12.dp) {
+        CardTitle(Lucide.Building2, "Property")
+        Column {
+            Text(property.propertyName, style = RfType.BodyLg.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface)
+            Text(
+                listOf(property.address, property.city, property.pincode).filter(String::isNotBlank).joinToString(", "),
+                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 3.dp)
+            )
+        }
+        WideButton("View Property", Lucide.Eye, Rf.Low, Rf.Primary, Modifier.fillMaxWidth(), onOpen)
+    }
+}
 
 /* ------------------------------ Add or edit a room ------------------------------ */
 

@@ -417,6 +417,7 @@ private fun RentFlowApp() {
                             onBack = ::back,
                             onEdit = { go(Screen.RoomForm, null, a) },
                             onOpenTenant = { go(Screen.TenantDetails, it) },
+                            onOpenProperty = { go(Screen.PropertyDetails, it) },
                             onAssign = { go(Screen.AssignRoom, a) },
                             onDeleted = ::back
                         )
@@ -472,7 +473,6 @@ private fun RentFlowApp() {
                             roomId = a.orEmpty(),
                             shell = shell,
                             onBack = ::back,
-                            onNewTenant = { go(Screen.AddTenant, null, a) },
                             onDone = ::back
                         )
 
