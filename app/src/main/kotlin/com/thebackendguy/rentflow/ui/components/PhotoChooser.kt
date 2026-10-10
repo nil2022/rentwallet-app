@@ -53,7 +53,9 @@ private val UriListSaver = listSaver<List<Uri>, String>(save = { list -> list.ma
  * Returns the function that opens the choice; the sheet and the crop screen are
  * shown from here. The gallery may return up to [limit] photos at once, the
  * camera always one. [round] crops in a round 1:1 frame for a profile photo.
- * [onView] and [onRemove] add "View photo" and "Remove photo" to the sheet.
+ * [onView] and [onRemove] add "View photo" and "Remove photo" to the sheet
+ * ([removeLabel] and [removeHint] say what is removed and what is left). [onPdf] adds "Choose a PDF" and gets
+ * a copy of the file the user picks.
  */
 @Composable
 fun photoChooser(
@@ -62,6 +64,9 @@ fun photoChooser(
     title: String = "Add a photo",
     onView: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
+    removeLabel: String = "Remove photo",
+    removeHint: String = "Show the initials instead",
+    onPdf: ((Uri) -> Unit)? = null,
     onPicked: (List<Uri>) -> Unit
 ): () -> Unit {
     val context = LocalContext.current
@@ -106,6 +111,15 @@ fun photoChooser(
     val single = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) keep(listOf(uri))
     }
+    // A PDF is copied in too (the picked file can only be read for a while) and used as it is
+    val pdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null || onPdf == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val copy = PhotoFiles.copyIn(context, uri, extension = "pdf")
+            if (copy == null) Toasts.error("Couldn’t open that PDF. Try a different one.") else onPdf(copy)
+        }
+    }
+
     // The multi-photo picker needs a limit above one
     val multiple = if (limit > 1) {
         rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(limit)) { uris ->
@@ -120,6 +134,18 @@ fun photoChooser(
             several = limit > 1,
             onView = onView?.let { view -> { choosing = false; view() } },
             onRemove = onRemove?.let { remove -> { choosing = false; remove() } },
+            removeLabel = removeLabel,
+            removeHint = removeHint,
+            onPdf = onPdf?.let {
+                {
+                    choosing = false
+                    try {
+                        pdf.launch(arrayOf("application/pdf"))
+                    } catch (_: ActivityNotFoundException) {
+                        Toasts.error("No file picker found on this phone.")
+                    }
+                }
+            },
             onCamera = {
                 choosing = false
                 val uri = PhotoFiles.create(context)
@@ -175,6 +201,9 @@ private fun PhotoSourceSheet(
     several: Boolean,
     onView: (() -> Unit)?,
     onRemove: (() -> Unit)?,
+    removeLabel: String,
+    removeHint: String,
+    onPdf: (() -> Unit)?,
     onCamera: () -> Unit,
     onGallery: () -> Unit,
     onDismiss: () -> Unit
@@ -190,7 +219,8 @@ private fun PhotoSourceSheet(
             if (onView != null) SourceRow(Lucide.Eye, "View photo", "See it full screen", onView)
             if (hasCamera) SourceRow(Lucide.Camera, "Take photo", "Use the camera, then crop", onCamera)
             SourceRow(Lucide.Image, "Choose from gallery", if (several) "Pick photos, then crop each" else "Pick a photo, then crop", onGallery)
-            if (onRemove != null) SourceRow(Lucide.Trash2, "Remove photo", "Show the initials instead", onRemove, danger = true)
+            if (onPdf != null) SourceRow(Lucide.FileText, "Choose a PDF", "A receipt or bank statement from your files", onPdf)
+            if (onRemove != null) SourceRow(Lucide.Trash2, removeLabel, removeHint, onRemove, danger = true)
             TonalButton("Cancel", onClick = onDismiss, modifier = Modifier.padding(top = 6.dp))
         }
     }
@@ -230,11 +260,11 @@ private fun SourceRow(icon: LucideIcon, title: String, sub: String, onClick: () 
 internal object PhotoFiles {
     private const val DAY_MS = 24 * 60 * 60 * 1000L
 
-    private fun newFile(context: Context): File {
+    private fun newFile(context: Context, extension: String = "jpg"): File {
         val dir = File(context.cacheDir, "photos").apply { mkdirs() }
         // Photos from earlier days are no longer in any open form
         dir.listFiles()?.filter { it.lastModified() < System.currentTimeMillis() - DAY_MS }?.forEach { it.delete() }
-        return File(dir, "photo-${UUID.randomUUID()}.jpg")
+        return File(dir, "photo-${UUID.randomUUID()}.$extension")
     }
 
     private fun uriFor(context: Context, file: File): Uri =
@@ -243,9 +273,9 @@ internal object PhotoFiles {
     /** An empty file for the camera to save into. */
     fun create(context: Context): Uri = uriFor(context, newFile(context))
 
-    /** A copy of [source] in the folder, or null if it can't be read. */
-    suspend fun copyIn(context: Context, source: Uri): Uri? = withContext(Dispatchers.IO) {
-        val file = newFile(context)
+    /** A copy of [source] in the folder, or null if it can't be read. A PDF keeps the "pdf" [extension]. */
+    suspend fun copyIn(context: Context, source: Uri, extension: String = "jpg"): Uri? = withContext(Dispatchers.IO) {
+        val file = newFile(context, extension)
         runCatching {
             context.contentResolver.openInputStream(source).use { input ->
                 checkNotNull(input) { "Photo can't be opened" }

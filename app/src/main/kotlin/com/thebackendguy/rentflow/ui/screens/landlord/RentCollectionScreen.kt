@@ -70,6 +70,7 @@ import com.thebackendguy.rentflow.data.remote.TenantDto
 import com.thebackendguy.rentflow.data.shortLabel
 import com.thebackendguy.rentflow.ui.components.AppPage
 import com.thebackendguy.rentflow.ui.components.ErrorState
+import com.thebackendguy.rentflow.ui.components.Fab
 import com.thebackendguy.rentflow.ui.components.LoadingCards
 import com.thebackendguy.rentflow.ui.components.Pill
 import com.thebackendguy.rentflow.ui.components.PhotoViewer
@@ -94,26 +95,49 @@ import kotlin.math.roundToInt
  * (the overdue view), and the tenants in a room who have no bill for the month.
  */
 
+/** The month, property, status and view last looked at, kept while the app runs so coming back from a form shows them again. */
+private object CollectionMemory {
+    var month: String? = null
+    var propertyId: String? = null
+    var filter: Int = 0
+    var overdueView: Boolean = false
+}
+
 private enum class BillFilter(val key: String, val label: String) {
     All("all", "All"), Pending("pending", "Pending"), Partial("partial", "Partial"), Paid("paid", "Paid")
 }
 
+/**
+ * [onRecord] starts Record Payment with "Who is it for?"; [onRecordFor] opens the form
+ * for a tenant and month ("YYYY-MM"), from Collect or Create bill.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RentCollectionScreen(shell: Shell) {
+fun RentCollectionScreen(shell: Shell, onRecord: () -> Unit, onRecordFor: (tenantId: String, month: String) -> Unit) {
     val portfolioState = portfolioState()
     val now = YearMonth.now()
-    var monthText by rememberSaveable { mutableStateOf(now.apiMonth()) }
-    var propertyId by rememberSaveable { mutableStateOf<String?>(null) }
-    var filter by rememberSaveable { mutableIntStateOf(BillFilter.All.ordinal) }
+    var monthText by rememberSaveable { mutableStateOf(CollectionMemory.month ?: now.apiMonth()) }
+    var propertyId by rememberSaveable { mutableStateOf(CollectionMemory.propertyId) }
+    var filter by rememberSaveable { mutableIntStateOf(CollectionMemory.filter) }
     var search by rememberSaveable { mutableStateOf("") }
     var searching by rememberSaveable { mutableStateOf(false) }
-    var overdueView by rememberSaveable { mutableStateOf(false) }
+    var overdueView by rememberSaveable { mutableStateOf(CollectionMemory.overdueView) }
     var notBilledOpen by rememberSaveable { mutableStateOf(false) }
     var openBillId by rememberSaveable { mutableStateOf<String?>(null) }
     var choosingMonth by remember { mutableStateOf(false) }
     var choosingProperty by remember { mutableStateOf(false) }
     val month = parseApiMonth(monthText) ?: now
+    LaunchedEffect(monthText, propertyId, filter, overdueView) {
+        CollectionMemory.month = monthText
+        CollectionMemory.propertyId = propertyId
+        CollectionMemory.filter = filter
+        CollectionMemory.overdueView = overdueView
+    }
+    // A property remembered from another account (or since deleted) no longer applies
+    LaunchedEffect(portfolioState.data, propertyId) {
+        val portfolio = portfolioState.data ?: return@LaunchedEffect
+        if (propertyId != null && portfolio.property(propertyId) == null) propertyId = null
+    }
 
     // The bills for this month and property, loaded again after any bill changes
     val version by PaymentStore.version.collectAsState()
@@ -127,135 +151,147 @@ fun RentCollectionScreen(shell: Shell) {
         }
     }
 
-    AppPage(topBar = { shell.TopBar("Payments") }, bottomBar = { shell.BottomNav(4) }) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column {
-                Text("Rent Collection", style = RfType.HeadlineMd.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
-                Text(
-                    "Bills and payments across your properties.", style = RfType.BodySm, color = Rf.OnSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            val data = loaded.data
-            if (data == null) {
-                if (loaded.error != null) ErrorState(loaded.error.orEmpty(), onRetry = { retry++ }) else LoadingCards(3)
-                return@Column
-            }
-
-            val properties = portfolioState.data?.properties.orEmpty()
-            val bills = if (overdueView) data.overdue else data.bills
-            val totals = data.totals
-            // "Collected" is the part of the bills that is covered: money received plus advance used
-            val summary = if (!overdueView && totals != null) {
-                Totals(totals.totalDue, totals.totalSettled, totals.totalPending, totals.totalAdvanceHeld)
-            } else {
-                Totals(
-                    billed = bills.sumOf { it.totalDue },
-                    collected = bills.sumOf { it.totalDue - it.pendingAmount },
-                    due = bills.sumOf { it.pendingAmount },
-                    advance = bills.sumOf { it.advanceLeft }
-                )
-            }
-            val overdueAmount = data.overdue.sumOf { it.pendingAmount }
-            val overdueTenants = data.overdue.map { it.tenantId }.distinct().size
-            val statusFilter = BillFilter.entries[filter]
-            val q = search.trim()
-            val rows = bills.filter { bill ->
-                (overdueView || statusFilter == BillFilter.All || bill.paymentStatus == statusFilter.key) &&
-                    (q.isEmpty() || "${bill.tenant?.fullName.orEmpty()} ${bill.room?.roomNumber.orEmpty()}".contains(q, ignoreCase = true))
-            }
-            // Tenants in a room (in the chosen property) with no bill for the month on screen
-            val billed = data.bills.map { it.tenantId }.toSet()
-            val notBilled = if (overdueView) emptyList() else portfolioState.data?.tenants.orEmpty()
-                .filter { it.roomId != null && (propertyId == null || it.propertyId == propertyId) && it.id !in billed }
-
-            Column(Modifier.alpha(if (loaded.loading) 0.6f else 1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SummaryCard(
-                    summary,
-                    unpaid = bills.count { it.pendingAmount > 0 },
-                    title = if (overdueView) "Collected on these bills" else "Collected in ${month.label()}"
-                )
-                if (!overdueView && overdueTenants > 0) {
-                    OverdueLine(overdueAmount, overdueTenants) {
-                        filter = BillFilter.All.ordinal
-                        overdueView = true
-                    }
+    Box(Modifier.fillMaxSize()) {
+        AppPage(topBar = { shell.TopBar("Payments") }, bottomBar = { shell.BottomNav(4) }) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column {
+                    Text("Rent Collection", style = RfType.HeadlineMd.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                    Text(
+                        "Bills and payments across your properties.", style = RfType.BodySm, color = Rf.OnSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
 
-                // Month, property and search; the overdue view swaps the month for its own tag
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    when {
-                        searching -> {
-                            Box(Modifier.weight(1f)) { SearchBox(search, "Search bills") { search = it } }
-                            Text(
-                                "Cancel", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
-                                modifier = Modifier.pressable({
-                                    search = ""
-                                    searching = false
-                                }).padding(horizontal = 4.dp)
-                            )
-                        }
-                        overdueView -> {
-                            OverdueTag(Modifier.weight(1f))
-                            Text(
-                                "Back", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
-                                modifier = Modifier.height(40.dp).pressable({ overdueView = false }).softShadow(RoundedCornerShape(11.dp))
-                                    .clip(RoundedCornerShape(11.dp)).background(Rf.Lowest).padding(horizontal = 14.dp, vertical = 11.dp)
-                            )
-                            SquareButton(Lucide.Search, search.isNotEmpty(), "Search") { searching = true }
-                        }
-                        else -> {
-                            MonthStepper(month, Modifier.weight(1f), onMonth = { monthText = it.apiMonth() }, onPick = { choosingMonth = true })
-                            SquareButton(Lucide.Building2, propertyId != null, "Property") { choosingProperty = true }
-                            SquareButton(Lucide.Search, search.isNotEmpty(), "Search") { searching = true }
-                        }
-                    }
-                }
-                if (!overdueView) {
-                    StatusTabs(filter, counts = BillFilter.entries.map { f -> if (f == BillFilter.All) bills.size else bills.count { it.paymentStatus == f.key } }) {
-                        filter = it
-                    }
-                }
-                val propertyName = properties.find { it.id == propertyId }?.propertyName
-                if (propertyName != null || (q.isNotEmpty() && !searching) || (!overdueView && month != now)) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (propertyName != null) FilterChip(propertyName) { propertyId = null }
-                        if (q.isNotEmpty() && !searching) FilterChip("“$q”") { search = "" }
-                        if (!overdueView && month != now) FilterChip("Back to this month", plain = true) { monthText = now.apiMonth() }
-                    }
+                val data = loaded.data
+                if (data == null) {
+                    if (loaded.error != null) ErrorState(loaded.error.orEmpty(), onRetry = { retry++ }) else LoadingCards(3)
+                    return@Column
                 }
 
-                if (rows.isEmpty()) {
-                    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(28.dp)) {
-                        Text("No bills found", style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                        Text(
-                            when {
-                                q.isNotEmpty() || statusFilter != BillFilter.All -> "Try a different search or status."
-                                overdueView -> "Nothing is overdue from earlier months."
-                                else -> "Nothing has been billed for ${month.label()} yet."
-                            },
-                            style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                        )
-                    }
+                val properties = portfolioState.data?.properties.orEmpty()
+                val bills = if (overdueView) data.overdue else data.bills
+                val totals = data.totals
+                // "Collected" is the part of the bills that is covered: money received plus advance used
+                val summary = if (!overdueView && totals != null) {
+                    Totals(totals.totalDue, totals.totalSettled, totals.totalPending, totals.totalAdvanceHeld)
                 } else {
-                    rows.forEach { bill -> BillCard(bill, showMonth = overdueView) { openBillId = bill.id } }
+                    Totals(
+                        billed = bills.sumOf { it.totalDue },
+                        collected = bills.sumOf { it.totalDue - it.pendingAmount },
+                        due = bills.sumOf { it.pendingAmount },
+                        advance = bills.sumOf { it.advanceLeft }
+                    )
+                }
+                val overdueAmount = data.overdue.sumOf { it.pendingAmount }
+                val overdueTenants = data.overdue.map { it.tenantId }.distinct().size
+                val statusFilter = BillFilter.entries[filter]
+                val q = search.trim()
+                val rows = bills.filter { bill ->
+                    (overdueView || statusFilter == BillFilter.All || bill.paymentStatus == statusFilter.key) &&
+                        (q.isEmpty() || "${bill.tenant?.fullName.orEmpty()} ${bill.room?.roomNumber.orEmpty()}".contains(q, ignoreCase = true))
+                }
+                // Tenants in a room (in the chosen property) with no bill for the month on screen
+                val billed = data.bills.map { it.tenantId }.toSet()
+                val notBilled = if (overdueView) emptyList() else portfolioState.data?.tenants.orEmpty()
+                    .filter { it.roomId != null && (propertyId == null || it.propertyId == propertyId) && it.id !in billed }
+
+                Column(Modifier.alpha(if (loaded.loading) 0.6f else 1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SummaryCard(
+                        summary,
+                        unpaid = bills.count { it.pendingAmount > 0 },
+                        title = if (overdueView) "Collected on these bills" else "Collected in ${month.label()}"
+                    )
+                    if (!overdueView && overdueTenants > 0) {
+                        OverdueLine(overdueAmount, overdueTenants) {
+                            filter = BillFilter.All.ordinal
+                            overdueView = true
+                        }
+                    }
+
+                    // Month, property and search; the overdue view swaps the month for its own tag
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        when {
+                            searching -> {
+                                Box(Modifier.weight(1f)) { SearchBox(search, "Search bills") { search = it } }
+                                Text(
+                                    "Cancel", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
+                                    modifier = Modifier.pressable({
+                                        search = ""
+                                        searching = false
+                                    }).padding(horizontal = 4.dp)
+                                )
+                            }
+                            overdueView -> {
+                                OverdueTag(Modifier.weight(1f))
+                                Text(
+                                    "Back", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
+                                    modifier = Modifier.height(40.dp).pressable({ overdueView = false }).softShadow(RoundedCornerShape(11.dp))
+                                        .clip(RoundedCornerShape(11.dp)).background(Rf.Lowest).padding(horizontal = 14.dp, vertical = 11.dp)
+                                )
+                                SquareButton(Lucide.Search, search.isNotEmpty(), "Search") { searching = true }
+                            }
+                            else -> {
+                                MonthStepper(month, Modifier.weight(1f), onMonth = { monthText = it.apiMonth() }, onPick = { choosingMonth = true })
+                                SquareButton(Lucide.Building2, propertyId != null, "Property") { choosingProperty = true }
+                                SquareButton(Lucide.Search, search.isNotEmpty(), "Search") { searching = true }
+                            }
+                        }
+                    }
+                    if (!overdueView) {
+                        StatusTabs(filter, counts = BillFilter.entries.map { f -> if (f == BillFilter.All) bills.size else bills.count { it.paymentStatus == f.key } }) {
+                            filter = it
+                        }
+                    }
+                    val propertyName = properties.find { it.id == propertyId }?.propertyName
+                    if (propertyName != null || (q.isNotEmpty() && !searching) || (!overdueView && month != now)) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (propertyName != null) FilterChip(propertyName) { propertyId = null }
+                            if (q.isNotEmpty() && !searching) FilterChip("“$q”") { search = "" }
+                            if (!overdueView && month != now) FilterChip("Back to this month", plain = true) { monthText = now.apiMonth() }
+                        }
+                    }
+
+                    if (rows.isEmpty()) {
+                        RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(28.dp)) {
+                            Text("No bills found", style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                            Text(
+                                when {
+                                    q.isNotEmpty() || statusFilter != BillFilter.All -> "Try a different search or status."
+                                    overdueView -> "Nothing is overdue from earlier months."
+                                    else -> "Nothing has been billed for ${month.label()} yet."
+                                },
+                                style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            )
+                        }
+                    } else {
+                        rows.forEach { bill ->
+                            BillCard(bill, showMonth = overdueView, onOpen = { openBillId = bill.id }, onCollect = { onRecordFor(bill.tenantId, bill.monthYear) })
+                        }
+                    }
+
+                    if (notBilled.isNotEmpty()) {
+                        NotBilledCard(notBilled, month, notBilledOpen, onToggle = { notBilledOpen = !notBilledOpen }) { tenant ->
+                            onRecordFor(tenant.id, month.apiMonth())
+                        }
+                    }
+                    // Room for the floating Record button over the last card
+                    Box(Modifier.height(56.dp))
                 }
 
-                if (notBilled.isNotEmpty()) NotBilledCard(notBilled, month, notBilledOpen) { notBilledOpen = !notBilledOpen }
+                if (choosingMonth) MonthSheet(month, onPick = { monthText = it.apiMonth() }, onDismiss = { choosingMonth = false })
+                if (choosingProperty) {
+                    PropertySheet(properties, propertyId, onPick = {
+                        propertyId = it
+                        choosingProperty = false
+                    }, onDismiss = { choosingProperty = false })
+                }
+                val openBill = (data.bills + data.unpaid).find { it.id == openBillId }
+                if (openBill != null) BillSheet(openBill, onDismiss = { openBillId = null })
             }
-
-            if (choosingMonth) MonthSheet(month, onPick = { monthText = it.apiMonth() }, onDismiss = { choosingMonth = false })
-            if (choosingProperty) {
-                PropertySheet(properties, propertyId, onPick = {
-                    propertyId = it
-                    choosingProperty = false
-                }, onDismiss = { choosingProperty = false })
-            }
-            val openBill = (data.bills + data.unpaid).find { it.id == openBillId }
-            if (openBill != null) BillSheet(openBill, onDismiss = { openBillId = null })
         }
+        // Floats above the bottom bar so it stays in reach while the list scrolls
+        Fab("Record", Lucide.Plus, onRecord, Modifier.align(Alignment.BottomEnd))
     }
 }
 
@@ -418,7 +454,7 @@ private fun FilterChip(label: String, plain: Boolean = false, onClick: () -> Uni
 
 /** The web's phone bill card: who, status, total, received and due, and how much is covered. */
 @Composable
-private fun BillCard(bill: BillDto, showMonth: Boolean, onOpen: () -> Unit) {
+private fun BillCard(bill: BillDto, showMonth: Boolean, onOpen: () -> Unit, onCollect: () -> Unit) {
     val name = bill.tenant?.fullName?.ifBlank { null } ?: "Tenant"
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp), spacing = 10.dp, onClick = onOpen) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -436,23 +472,31 @@ private fun BillCard(bill: BillDto, showMonth: Boolean, onOpen: () -> Unit) {
                 Box(Modifier.padding(top = 6.dp)) { BillStatusPills(bill) }
             }
         }
-        Column {
-            Text(inr(bill.totalDue), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
-            Text(
-                buildAnnotatedString {
-                    append("Received ${inr(bill.paidAmount)}")
-                    when {
-                        bill.pendingAmount > 0 -> {
-                            append(" • ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Rf.Error)) { append("Due ${inr(bill.pendingAmount)}") }
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(inr(bill.totalDue), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                Text(
+                    buildAnnotatedString {
+                        append("Received ${inr(bill.paidAmount)}")
+                        when {
+                            bill.pendingAmount > 0 -> {
+                                append(" • ")
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Rf.Error)) { append("Due ${inr(bill.pendingAmount)}") }
+                            }
+                            bill.advanceAmount > 0 -> append(" • ${inr(bill.advanceAmount)} advance")
                         }
-                        bill.advanceAmount > 0 -> append(" • ${inr(bill.advanceAmount)} advance")
-                    }
-                },
-                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 2.dp)
-            )
-            CoverBar(bill, 5.dp, Modifier.padding(top = 7.dp))
-            CreditNote(bill)
+                    },
+                    style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 2.dp)
+                )
+                CoverBar(bill, 5.dp, Modifier.padding(top = 7.dp))
+                CreditNote(bill)
+            }
+            if (bill.pendingAmount > 0) {
+                Text(
+                    "Collect", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnPrimary,
+                    modifier = Modifier.pressable(onCollect).clip(RoundedCornerShape(11.dp)).background(Rf.Primary).padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
         }
     }
 }
@@ -508,7 +552,7 @@ private fun CreditNote(bill: BillDto) {
 /* ------------------------------ Not billed ------------------------------ */
 
 @Composable
-private fun NotBilledCard(tenants: List<TenantDto>, month: YearMonth, open: Boolean, onToggle: () -> Unit) {
+private fun NotBilledCard(tenants: List<TenantDto>, month: YearMonth, open: Boolean, onToggle: () -> Unit, onCreate: (TenantDto) -> Unit) {
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f)) {
@@ -535,6 +579,10 @@ private fun NotBilledCard(tenants: List<TenantDto>, month: YearMonth, open: Bool
                             style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                     }
+                    Text(
+                        "Create bill", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.OnPrimary,
+                        modifier = Modifier.pressable({ onCreate(tenant) }).clip(RoundedCornerShape(9.dp)).background(Rf.Primary).padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
                 }
             }
         }

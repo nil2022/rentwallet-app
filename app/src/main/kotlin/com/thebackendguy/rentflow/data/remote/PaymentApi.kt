@@ -2,7 +2,11 @@ package com.thebackendguy.rentflow.data.remote
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -19,12 +23,26 @@ interface PaymentApi {
         @Query("status") status: String? = null,
         @Query("propertyId") propertyId: String? = null,
         @Query("tenantId") tenantId: String? = null,
+        @Query("roomId") roomId: String? = null,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): ApiEnvelope<List<BillDto>>
 
     @GET("landlord/payment/{id}")
     suspend fun bill(@Path("id") id: String): ApiEnvelope<BillDto>
+
+    /*
+     * Saving takes JSON built by hand: an edit must be able to send null (no electricity,
+     * remove a photo), which the encoder would otherwise leave out.
+     */
+
+    /** A new bill: tenantId, monthYear, rent, electricity, otherCharges, and any money received. */
+    @POST("landlord/payment")
+    suspend fun createBill(@Body body: JsonObject): ApiEnvelope<BillDto>
+
+    /** Changes a bill; `paymentId` goes in the body. The tenant's advance is worked out again. */
+    @PATCH("landlord/payment")
+    suspend fun updateBill(@Body body: JsonObject): ApiEnvelope<BillDto>
 }
 
 /** The tenant a bill belongs to, as the API embeds it. */

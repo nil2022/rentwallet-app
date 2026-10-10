@@ -60,6 +60,8 @@ import com.thebackendguy.rentflow.ui.screens.auth.LoginScreen
 import com.thebackendguy.rentflow.ui.screens.auth.RegisterScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.AddTenantScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.AssignRoomScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.BillTenantPickerScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.RecordPaymentScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.ChangePasswordScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.EditProfileScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.LandlordOverviewScreen
@@ -90,7 +92,7 @@ private enum class Screen {
     Login, ForgotPassword, Register,
     TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
     LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
-    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, LandlordProfile, EditProfile, ChangePassword
+    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, PickBillTenant, RecordPayment, LandlordProfile, EditProfile, ChangePassword
 }
 
 /** One entry of the back stack: a screen and the ids it shows (see each screen in [RentFlowApp]). */
@@ -477,7 +479,27 @@ private fun RentFlowApp() {
                             onDone = ::back
                         )
 
-                        Screen.RentCollection -> RentCollectionScreen(shell = shell)
+                        Screen.RentCollection -> RentCollectionScreen(
+                            shell = shell,
+                            onRecord = { go(Screen.PickBillTenant) },
+                            onRecordFor = { tenantId, month -> go(Screen.RecordPayment, tenantId, month) }
+                        )
+
+                        Screen.PickBillTenant -> BillTenantPickerScreen(
+                            shell = shell,
+                            onBack = ::back,
+                            onPick = { replace(Screen.RecordPayment, it) }
+                        )
+
+                        // a = tenant id, b = billing month ("YYYY-MM", this month when null)
+                        Screen.RecordPayment -> RecordPaymentScreen(
+                            tenantId = a.orEmpty(),
+                            initialMonth = b,
+                            editBillId = null,
+                            shell = shell,
+                            onBack = ::back,
+                            onDone = ::back
+                        )
 
                         Screen.LandlordProfile -> LandlordProfileScreen(
                             user = user,

@@ -1,5 +1,6 @@
 package com.thebackendguy.rentflow.data
 
+import com.thebackendguy.rentflow.data.remote.ApiEnvelope
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.BillDto
 import com.thebackendguy.rentflow.data.remote.BillTotalsDto
@@ -10,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.JsonObject
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -91,4 +93,71 @@ object PaymentStore {
         }
         ApiResult.Ok(CollectionBills(monthBills.data.orEmpty(), monthBills.summary, unpaid))
     }
+
+    /** One tenant's bills, one room's bills, or one month's bills (newest month first). */
+    suspend fun bills(tenantId: String? = null, roomId: String? = null, month: YearMonth? = null): ApiResult<List<BillDto>> =
+        when (val r = apiCall { api.bills(monthYear = month?.apiMonth(), tenantId = tenantId, roomId = roomId, limit = PAGE_SIZE) }) {
+            is ApiResult.Fail -> r
+            is ApiResult.Ok -> ApiResult.Ok(r.value.data.orEmpty())
+        }
+
+    /** Saves a new bill ([billId] null) or changes one; every screen showing bills loads again. */
+    suspend fun save(billId: String?, body: JsonObject): ApiResult<ApiEnvelope<BillDto>> {
+        val result = apiCall { if (billId == null) api.createBill(body) else api.updateBill(body) }
+        if (result is ApiResult.Ok) changed()
+        return result
+    }
+}
+
+/* ------------------------------ Advance ------------------------------ */
+
+fun round2(value: Double): Double = Math.round(value * 100.0) / 100.0
+
+/** A bill as the advance rules see it: what it costs and the money received for it. */
+data class AdvanceBill(val id: String, val monthYear: String, val total: Double, val paid: Double)
+
+/**
+ * The result for one bill: advance from earlier bills it uses ([credit], from the
+ * months in [sources]), what is still due, what was paid beyond it ([advance]) and
+ * how much of that no later bill used ([left]).
+ */
+data class AdvanceRow(
+    val id: String,
+    val monthYear: String,
+    val credit: Double,
+    val sources: List<String>,
+    val pending: Double,
+    val advance: Double,
+    val left: Double
+)
+
+/**
+ * The backend's advance rules (reconcileTenantCredit in the API), run here to
+ * preview a payment before it is saved, as the web's carryAdvance does. Walking
+ * from the oldest month, each bill's own money counts first, then advance left by
+ * earlier bills (oldest first) covers what is still due; money beyond a bill's
+ * total is advance for later bills only. Rows come oldest month first.
+ */
+fun carryAdvance(bills: List<AdvanceBill>): List<AdvanceRow> {
+    class Pot(val index: Int, var left: Double)
+    val pots = mutableListOf<Pot>()
+    val rows = bills.sortedBy { it.monthYear }.mapIndexed { index, bill ->
+        val total = round2(bill.total)
+        val paid = round2(bill.paid)
+        var need = round2(maxOf(total - paid, 0.0))
+        val sources = mutableListOf<String>()
+        var credit = 0.0
+        pots.forEach { pot ->
+            if (need <= 0 || pot.left <= 0) return@forEach
+            val take = round2(minOf(pot.left, need))
+            pot.left = round2(pot.left - take)
+            need = round2(need - take)
+            credit = round2(credit + take)
+            sources += bills.sortedBy { it.monthYear }[pot.index].monthYear
+        }
+        val advance = round2(maxOf(paid - total, 0.0))
+        if (advance > 0) pots += Pot(index, advance)
+        AdvanceRow(bill.id, bill.monthYear, credit, sources, need, advance, 0.0)
+    }
+    return rows.mapIndexed { index, row -> row.copy(left = pots.find { it.index == index }?.left ?: 0.0) }
 }

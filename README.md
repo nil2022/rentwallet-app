@@ -63,6 +63,8 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 
 **27 Payments: Rent Collection** (no screenshot yet; [design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)). The web’s phone Rent Collection: “Collected in Oct 2026” with the share of the billed amount, Still due and Advance held; a red “₹… overdue · Review” line that opens the bills still unpaid from earlier months; a month stepper (tap the month for a grid of months, no future ones), a property sheet and search; All / Pending / Partial / Paid tabs with counts; a card per bill with its status, total, received and due, a bar of how much is covered (advance in indigo, money in green) and any advance used. Tenants in a room with no bill for the month are listed under “Review”. Tapping a bill opens its details in a bottom sheet: totals, breakdown with the meter readings, payment, advance and the meter photo or payment proof (a PDF opens in the phone’s viewer).
 
+**28 Record Payment** (same mockup). The floating **Record** button asks “Who is it for?” (tenants in a room, each marked “Bill exists” or “Not billed”), and **Collect** on a bill or **Create bill** for a tenant not billed opens the form straight away. The web’s form: billing month (the last 12, “bill exists” marked); for a new bill, rent filled in from the room, electricity with the previous reading and rate carried on from the room’s last bill (and a warning in a shared room), an optional meter photo, other charges with WiFi / Gas / Maintenance / Water chips; for a bill that exists, what it holds and “Received now”; on a fully paid bill, “Receive an advance”. Then the amount (Full amount / Half / Not received yet), Cash / UPI / Cheque, the date, an optional proof (photo or PDF) and notes, and a bill summary. Advance is previewed with the backend’s rules: advance from earlier bills that comes off this one, money beyond the bill and which later month uses it, and earlier months still due. The button says what is saved, e.g. “Save bill + ₹5,500 payment”.
+
 | 19 Room: let | 19 Room: vacant | 20 Add or Edit Room |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/19-room-let.png" width="220" alt="Room with a tenant"> | <img src="docs/screenshots/19-room-vacant.png" width="220" alt="Vacant room"> | <img src="docs/screenshots/20-room-form.png" width="220" alt="Add room"> |
@@ -136,6 +138,8 @@ flowchart TD
         RM -->|"Add room"| RF
         LO -->|"Payments tab"| RC["27 Rent Collection"]
         RC -->|"Tap a bill"| BD["Bill details"]
+        RC -->|"Record"| PT["Who is it for?"] --> RP["28 Record Payment"]
+        RC -->|"Collect / Create bill"| RP
         PL -->|"Tap a property"| PD["17 Property Details"]
         PL -->|"Add property"| PF["18 Property form"]
         PD -->|"Edit property"| PF
@@ -175,6 +179,7 @@ How navigation works:
 | Properties, property details, rooms | Everything: list, details, add, edit, delete, photos | None |
 | Rooms tab | Everything: the property’s rooms, who lives in each, counts, filters | None |
 | Payments: Rent Collection | Everything: the month’s bills and totals, overdue bills, tenants not billed, bill details | None |
+| Record Payment | Everything: new bills, money received, advance, meter photo and payment proof uploads | None |
 | Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room | Paid / Due badges, rent status, tenant alerts, Send reminder |
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |
@@ -322,7 +327,7 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
 2. ~~**Landlord data:** properties, rooms, tenants and who lives in which room, with add, edit and delete.~~ Done.
 3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
-4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection uses them; recording payments, bill actions, Rent History and the money on Overview, Tenants and Profile come next ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
+4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection and Record Payment use them; bill actions, Rent History and the money on Overview, Tenants and Profile come next ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
 6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.
 7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.

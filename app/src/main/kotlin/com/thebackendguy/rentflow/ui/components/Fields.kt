@@ -76,7 +76,8 @@ fun RfTextField(
     }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = label, style = RfType.LabelMd, color = Rf.OnSurface)
+        // A field in a row of its own kind (e.g. a charge's name and amount) can go without one
+        if (label.isNotEmpty()) Text(text = label, style = RfType.LabelMd, color = Rf.OnSurface)
         Row(
             Modifier
                 .fillMaxWidth()
