@@ -9,7 +9,7 @@
   Built with Kotlin and Jetpack Compose, and designed to match the RentFlow web app’s phone layout.
 </p>
 
-> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. Rent collection, payments and the wallet still show **sample numbers** until their APIs exist (see [What’s next](#whats-next)).
+> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. The money figures on Overview, Tenants and Profile, the wallet, and the tenant’s rent screens still show **sample numbers** (see [What’s next](#whats-next)).
 
 ## Contents
 
@@ -60,6 +60,8 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | Rooms, let and vacant counts, then a card per property with its cover photo and how many rooms are let. | Swipeable photos, address, floors, parking and lift, and every room with its tenant or “Vacant”. | The web form’s fields in short sections, with chips, switches and up to 10 photos. Mistakes show under the field. |
 
 **26 Rooms tab** (no screenshot yet; [design mockup](https://claude.ai/artifact/2pPTYU1YF9Za16gYADb2PN)). The web’s phone room list: a Property dropdown, then the property’s cover, Monthly target, Total units, Full units and Units with space. Search by room number, type or size, and a Filters sheet with Status (All, Has space, Full) and Floor, each with its count; filters that are on show as chips you can tap off. Every room of the property is in one scroll (the web pages them ten at a time). Each card shows Empty, “1 of 2 filled”, Full or “3 tenants • shared”, the rent, swipeable photos, capacity bars, who lives there with a call button, features and the deposit, and “Assign Tenant” while the room has space. The tab remembers the property while the app runs.
+
+**27 Payments: Rent Collection** (no screenshot yet; [design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)). The web’s phone Rent Collection: “Collected in Oct 2026” with the share of the billed amount, Still due and Advance held; a red “₹… overdue · Review” line that opens the bills still unpaid from earlier months; a month stepper (tap the month for a grid of months, no future ones), a property sheet and search; All / Pending / Partial / Paid tabs with counts; a card per bill with its status, total, received and due, a bar of how much is covered (advance in indigo, money in green) and any advance used. Tenants in a room with no bill for the month are listed under “Review”. Tapping a bill opens its details in a bottom sheet: totals, breakdown with the meter readings, payment, advance and the meter photo or payment proof (a PDF opens in the phone’s viewer).
 
 | 19 Room: let | 19 Room: vacant | 20 Add or Edit Room |
 |:---:|:---:|:---:|
@@ -132,6 +134,8 @@ flowchart TD
         RM -->|"Tap a room"| RD
         RM -->|"Assign Tenant"| AR
         RM -->|"Add room"| RF
+        LO -->|"Payments tab"| RC["27 Rent Collection"]
+        RC -->|"Tap a bill"| BD["Bill details"]
         PL -->|"Tap a property"| PD["17 Property Details"]
         PL -->|"Add property"| PF["18 Property form"]
         PD -->|"Edit property"| PF
@@ -156,9 +160,9 @@ flowchart TD
 
 How navigation works:
 
-- **Bottom tabs.** Tenants have Home, Payments and Profile. Landlords have Overview, Properties, Rooms and Tenants, as on the web; Payments joins them once the rent collection screens are built. A room opened from the Rooms tab keeps Rooms lit, and from a property keeps Properties lit. A landlord’s Profile is not a tab: it opens from your photo in the top bar or your card in the side drawer.
+- **Bottom tabs.** Tenants have Home, Payments and Profile. Landlords have Overview, Properties, Rooms, Tenants and Payments, as on the web. A room opened from the Rooms tab keeps Rooms lit, and from a property keeps Properties lit. A landlord’s Profile is not a tab: it opens from your photo in the top bar or your card in the side drawer.
 - **Top bar.** The menu button opens the side drawer. The bell shows how many notifications are unread and opens them in a bottom sheet, the moon/sun button switches the theme, and your photo opens Profile. Inner screens show a back arrow and the screen title.
-- **Side drawer.** As on the web: 260 dp wide (at most 85% of the screen) and navy in both themes, with the logo, the menu, and a card with your photo, name and role that opens Profile. Log out is the icon on that card. A landlord’s menu is the web sidebar: Dashboard, Properties, Rooms and Tenants open those tabs; Rent Collection, Rent History, Rent Settings, Expenses, Reports and Settings are listed as on the web but do nothing yet. A tenant’s menu is their three tabs.
+- **Side drawer.** As on the web: 260 dp wide (at most 85% of the screen) and navy in both themes, with the logo, the menu, and a card with your photo, name and role that opens Profile. Log out is the icon on that card. A landlord’s menu is the web sidebar: Dashboard, Properties, Rooms and Tenants open those tabs and Rent Collection opens Payments; Rent History, Rent Settings, Expenses, Reports and Settings are listed as on the web but do nothing yet. A tenant’s menu is their three tabs.
 - **Back button.** Screens form a stack, so Back returns to the screen you came from. A tab goes back to the home screen; on a home screen or Login, Back leaves the app.
 - **Staying signed in.** With “Remember for 30 days”, the app opens signed in next time. Without it, the session ends when the app closes. If the server rejects the saved session, the app returns to login and says why.
 
@@ -170,6 +174,7 @@ How navigation works:
 | Landlord Overview | Property, tenant, vacant-room and rooms-with-space counts, the first three property cards | Payment ledger, sub-meter card |
 | Properties, property details, rooms | Everything: list, details, add, edit, delete, photos | None |
 | Rooms tab | Everything: the property’s rooms, who lives in each, counts, filters | None |
+| Payments: Rent Collection | Everything: the month’s bills and totals, overdue bills, tenants not billed, bill details | None |
 | Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room | Paid / Due badges, rent status, tenant alerts, Send reminder |
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |
@@ -317,7 +322,7 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
 2. ~~**Landlord data:** properties, rooms, tenants and who lives in which room, with add, edit and delete.~~ Done.
 3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
-4. **Landlord collections:** need landlord payment, monthly summary and reminder endpoints. They replace the sample numbers on Overview, Tenants and Profile.
+4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection uses them; recording payments, bill actions, Rent History and the money on Overview, Tenants and Profile come next ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
 6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.
 7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.

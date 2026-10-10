@@ -1,0 +1,818 @@
+package com.thebackendguy.rentflow.ui.screens.landlord
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.thebackendguy.rentflow.data.CollectionBills
+import com.thebackendguy.rentflow.data.Loadable
+import com.thebackendguy.rentflow.data.PaymentStore
+import com.thebackendguy.rentflow.data.Photo
+import com.thebackendguy.rentflow.data.apiDate
+import com.thebackendguy.rentflow.data.apiMonth
+import com.thebackendguy.rentflow.data.inr
+import com.thebackendguy.rentflow.data.isOverdue
+import com.thebackendguy.rentflow.data.isPdfLink
+import com.thebackendguy.rentflow.data.label
+import com.thebackendguy.rentflow.data.methodLabel
+import com.thebackendguy.rentflow.data.monthLabel
+import com.thebackendguy.rentflow.data.parseApiMonth
+import com.thebackendguy.rentflow.data.remote.ApiResult
+import com.thebackendguy.rentflow.data.remote.BillDto
+import com.thebackendguy.rentflow.data.remote.PropertyDto
+import com.thebackendguy.rentflow.data.remote.TenantDto
+import com.thebackendguy.rentflow.data.shortLabel
+import com.thebackendguy.rentflow.ui.components.AppPage
+import com.thebackendguy.rentflow.ui.components.ErrorState
+import com.thebackendguy.rentflow.ui.components.LoadingCards
+import com.thebackendguy.rentflow.ui.components.Pill
+import com.thebackendguy.rentflow.ui.components.PhotoViewer
+import com.thebackendguy.rentflow.ui.components.RemoteImage
+import com.thebackendguy.rentflow.ui.components.RfCard
+import com.thebackendguy.rentflow.ui.components.pressable
+import com.thebackendguy.rentflow.ui.components.softShadow
+import com.thebackendguy.rentflow.ui.icons.LIcon
+import com.thebackendguy.rentflow.ui.icons.Lucide
+import com.thebackendguy.rentflow.ui.icons.LucideIcon
+import com.thebackendguy.rentflow.ui.screens.Shell
+import com.thebackendguy.rentflow.ui.theme.Rf
+import com.thebackendguy.rentflow.ui.theme.RfType
+import java.time.YearMonth
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+/*
+ * The Payments tab: the web's phone Rent Collection page (RentCollection.jsx).
+ * One month's bills with their totals, the bills still unpaid from earlier months
+ * (the overdue view), and the tenants in a room who have no bill for the month.
+ */
+
+private enum class BillFilter(val key: String, val label: String) {
+    All("all", "All"), Pending("pending", "Pending"), Partial("partial", "Partial"), Paid("paid", "Paid")
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun RentCollectionScreen(shell: Shell) {
+    val portfolioState = portfolioState()
+    val now = YearMonth.now()
+    var monthText by rememberSaveable { mutableStateOf(now.apiMonth()) }
+    var propertyId by rememberSaveable { mutableStateOf<String?>(null) }
+    var filter by rememberSaveable { mutableIntStateOf(BillFilter.All.ordinal) }
+    var search by rememberSaveable { mutableStateOf("") }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var overdueView by rememberSaveable { mutableStateOf(false) }
+    var notBilledOpen by rememberSaveable { mutableStateOf(false) }
+    var openBillId by rememberSaveable { mutableStateOf<String?>(null) }
+    var choosingMonth by remember { mutableStateOf(false) }
+    var choosingProperty by remember { mutableStateOf(false) }
+    val month = parseApiMonth(monthText) ?: now
+
+    // The bills for this month and property, loaded again after any bill changes
+    val version by PaymentStore.version.collectAsState()
+    var retry by remember { mutableIntStateOf(0) }
+    var loaded by remember { mutableStateOf(Loadable<CollectionBills>(loading = true)) }
+    LaunchedEffect(monthText, propertyId, version, retry) {
+        loaded = loaded.copy(loading = true, error = null)
+        loaded = when (val result = PaymentStore.collection(month, propertyId)) {
+            is ApiResult.Ok -> Loadable(result.value)
+            is ApiResult.Fail -> loaded.copy(loading = false, error = result.message)
+        }
+    }
+
+    AppPage(topBar = { shell.TopBar("Payments") }, bottomBar = { shell.BottomNav(4) }) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column {
+                Text("Rent Collection", style = RfType.HeadlineMd.copy(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                Text(
+                    "Bills and payments across your properties.", style = RfType.BodySm, color = Rf.OnSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            val data = loaded.data
+            if (data == null) {
+                if (loaded.error != null) ErrorState(loaded.error.orEmpty(), onRetry = { retry++ }) else LoadingCards(3)
+                return@Column
+            }
+
+            val properties = portfolioState.data?.properties.orEmpty()
+            val bills = if (overdueView) data.overdue else data.bills
+            val totals = data.totals
+            // "Collected" is the part of the bills that is covered: money received plus advance used
+            val summary = if (!overdueView && totals != null) {
+                Totals(totals.totalDue, totals.totalSettled, totals.totalPending, totals.totalAdvanceHeld)
+            } else {
+                Totals(
+                    billed = bills.sumOf { it.totalDue },
+                    collected = bills.sumOf { it.totalDue - it.pendingAmount },
+                    due = bills.sumOf { it.pendingAmount },
+                    advance = bills.sumOf { it.advanceLeft }
+                )
+            }
+            val overdueAmount = data.overdue.sumOf { it.pendingAmount }
+            val overdueTenants = data.overdue.map { it.tenantId }.distinct().size
+            val statusFilter = BillFilter.entries[filter]
+            val q = search.trim()
+            val rows = bills.filter { bill ->
+                (overdueView || statusFilter == BillFilter.All || bill.paymentStatus == statusFilter.key) &&
+                    (q.isEmpty() || "${bill.tenant?.fullName.orEmpty()} ${bill.room?.roomNumber.orEmpty()}".contains(q, ignoreCase = true))
+            }
+            // Tenants in a room (in the chosen property) with no bill for the month on screen
+            val billed = data.bills.map { it.tenantId }.toSet()
+            val notBilled = if (overdueView) emptyList() else portfolioState.data?.tenants.orEmpty()
+                .filter { it.roomId != null && (propertyId == null || it.propertyId == propertyId) && it.id !in billed }
+
+            Column(Modifier.alpha(if (loaded.loading) 0.6f else 1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SummaryCard(
+                    summary,
+                    unpaid = bills.count { it.pendingAmount > 0 },
+                    title = if (overdueView) "Collected on these bills" else "Collected in ${month.label()}"
+                )
+                if (!overdueView && overdueTenants > 0) {
+                    OverdueLine(overdueAmount, overdueTenants) {
+                        filter = BillFilter.All.ordinal
+                        overdueView = true
+                    }
+                }
+
+                // Month, property and search; the overdue view swaps the month for its own tag
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    when {
+                        searching -> {
+                            Box(Modifier.weight(1f)) { SearchBox(search, "Search bills") { search = it } }
+                            Text(
+                                "Cancel", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
+                                modifier = Modifier.pressable({
+                                    search = ""
+                                    searching = false
+                                }).padding(horizontal = 4.dp)
+                            )
+                        }
+                        overdueView -> {
+                            OverdueTag(Modifier.weight(1f))
+                            Text(
+                                "Back", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
+                                modifier = Modifier.height(40.dp).pressable({ overdueView = false }).softShadow(RoundedCornerShape(11.dp))
+                                    .clip(RoundedCornerShape(11.dp)).background(Rf.Lowest).padding(horizontal = 14.dp, vertical = 11.dp)
+                            )
+                            SquareButton(Lucide.Search, search.isNotEmpty(), "Search") { searching = true }
+                        }
+                        else -> {
+                            MonthStepper(month, Modifier.weight(1f), onMonth = { monthText = it.apiMonth() }, onPick = { choosingMonth = true })
+                            SquareButton(Lucide.Building2, propertyId != null, "Property") { choosingProperty = true }
+                            SquareButton(Lucide.Search, search.isNotEmpty(), "Search") { searching = true }
+                        }
+                    }
+                }
+                if (!overdueView) {
+                    StatusTabs(filter, counts = BillFilter.entries.map { f -> if (f == BillFilter.All) bills.size else bills.count { it.paymentStatus == f.key } }) {
+                        filter = it
+                    }
+                }
+                val propertyName = properties.find { it.id == propertyId }?.propertyName
+                if (propertyName != null || (q.isNotEmpty() && !searching) || (!overdueView && month != now)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (propertyName != null) FilterChip(propertyName) { propertyId = null }
+                        if (q.isNotEmpty() && !searching) FilterChip("“$q”") { search = "" }
+                        if (!overdueView && month != now) FilterChip("Back to this month", plain = true) { monthText = now.apiMonth() }
+                    }
+                }
+
+                if (rows.isEmpty()) {
+                    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(28.dp)) {
+                        Text("No bills found", style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            when {
+                                q.isNotEmpty() || statusFilter != BillFilter.All -> "Try a different search or status."
+                                overdueView -> "Nothing is overdue from earlier months."
+                                else -> "Nothing has been billed for ${month.label()} yet."
+                            },
+                            style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        )
+                    }
+                } else {
+                    rows.forEach { bill -> BillCard(bill, showMonth = overdueView) { openBillId = bill.id } }
+                }
+
+                if (notBilled.isNotEmpty()) NotBilledCard(notBilled, month, notBilledOpen) { notBilledOpen = !notBilledOpen }
+            }
+
+            if (choosingMonth) MonthSheet(month, onPick = { monthText = it.apiMonth() }, onDismiss = { choosingMonth = false })
+            if (choosingProperty) {
+                PropertySheet(properties, propertyId, onPick = {
+                    propertyId = it
+                    choosingProperty = false
+                }, onDismiss = { choosingProperty = false })
+            }
+            val openBill = (data.bills + data.unpaid).find { it.id == openBillId }
+            if (openBill != null) BillSheet(openBill, onDismiss = { openBillId = null })
+        }
+    }
+}
+
+/** Billed, collected (money received plus advance used), still due and advance not used yet. */
+private data class Totals(val billed: Double, val collected: Double, val due: Double, val advance: Double)
+
+/* ------------------------------ Summary ------------------------------ */
+
+@Composable
+private fun SummaryCard(totals: Totals, unpaid: Int, title: String) {
+    val percent = if (totals.billed > 0) (totals.collected / totals.billed * 100).roundToInt() else 0
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { Caps(title) }
+            Text("$percent%", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
+        }
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(inr(totals.collected), style = RfType.HeadlineMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
+            Text("of ${inr(totals.billed)} billed", style = RfType.LabelMd, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
+        }
+        Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(7.dp).clip(CircleShape).background(Rf.Container)) {
+            Box(Modifier.fillMaxHeight().fillMaxWidth(percent.coerceIn(0, 100) / 100f).clip(CircleShape).background(Rf.Secondary))
+        }
+        HorizontalDivider(thickness = 1.dp, color = Rf.Low, modifier = Modifier.padding(top = 12.dp))
+        Row(Modifier.padding(top = 10.dp).height(IntrinsicSize.Min)) {
+            Column(Modifier.weight(1f)) {
+                Caps("Still due")
+                Text(inr(totals.due), style = RfType.BodyLg.copy(fontWeight = FontWeight.ExtraBold), color = if (totals.due > 0) Rf.Error else Rf.Secondary)
+                Text("$unpaid unpaid ${if (unpaid == 1) "bill" else "bills"}", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+            }
+            Box(Modifier.width(1.dp).fillMaxHeight().background(Rf.Low))
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Caps("Advance held")
+                Text(inr(totals.advance), style = RfType.BodyLg.copy(fontWeight = FontWeight.ExtraBold), color = if (totals.advance > 0) Rf.Primary else Rf.OnSurface)
+                Text(
+                    if (totals.advance > 0) "Kept for next bills" else "None held",
+                    style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** The thin red line for unpaid bills from earlier months; tapping it opens the overdue view. */
+@Composable
+private fun OverdueLine(amount: Double, tenants: Int, onReview: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier.fillMaxWidth().pressable(onReview, pressScale = 0.98f).clip(shape)
+            .background(Rf.ErrorContainer.copy(alpha = 0.55f)).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(Rf.ErrorContainer), contentAlignment = Alignment.Center) {
+            LIcon(Lucide.TriangleAlert, size = 17.dp, tint = Rf.Error)
+        }
+        Column(Modifier.weight(1f)) {
+            Text("${inr(amount)} overdue", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Error)
+            Text(
+                "$tenants ${if (tenants == 1) "tenant" else "tenants"} unpaid from earlier months",
+                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+            )
+        }
+        Text("Review", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Error)
+        LIcon(Lucide.ChevronRight, size = 15.dp, tint = Rf.Error)
+    }
+}
+
+/* ------------------------------ Filters ------------------------------ */
+
+private val ControlShape = RoundedCornerShape(11.dp)
+
+/** ‹ Oct 2026 › — the label opens the month grid; no future months. */
+@Composable
+private fun MonthStepper(month: YearMonth, modifier: Modifier, onMonth: (YearMonth) -> Unit, onPick: () -> Unit) {
+    val atCurrent = month >= YearMonth.now()
+    Row(
+        modifier.height(40.dp).softShadow(ControlShape).clip(ControlShape).background(Rf.Lowest).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StepArrow(Lucide.ArrowLeft, "Previous month", enabled = true) { onMonth(month.minusMonths(1)) }
+        Text(
+            month.label(), style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f).pressable(onPick, pressScale = 0.97f).padding(vertical = 10.dp)
+        )
+        StepArrow(Lucide.ArrowRight, "Next month", enabled = !atCurrent) { onMonth(month.plusMonths(1)) }
+    }
+}
+
+@Composable
+private fun StepArrow(icon: LucideIcon, description: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(32.dp).pressable(if (enabled) onClick else null).clip(RoundedCornerShape(9.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        LIcon(icon, size = 16.dp, tint = if (enabled) Rf.Primary else Rf.OutlineVariant, contentDescription = description)
+    }
+}
+
+/** A 40 dp square control; the dot says its filter is on. */
+@Composable
+private fun SquareButton(icon: LucideIcon, on: Boolean, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).pressable(onClick).softShadow(ControlShape).clip(ControlShape)
+            .background(if (on) Rf.PrimaryFixed else Rf.Lowest),
+        contentAlignment = Alignment.Center
+    ) {
+        LIcon(icon, size = 17.dp, tint = if (on) Rf.Primary else Rf.OnSurfaceVariant, contentDescription = description)
+        if (on) Box(Modifier.align(Alignment.TopEnd).padding(7.dp).size(6.dp).clip(CircleShape).background(Rf.Primary))
+    }
+}
+
+@Composable
+private fun OverdueTag(modifier: Modifier) {
+    Row(
+        modifier.height(40.dp).clip(ControlShape).background(Rf.ErrorContainer).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        LIcon(Lucide.TriangleAlert, size = 16.dp, tint = Rf.Error)
+        Text("Earlier months", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Error, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** All / Pending / Partial / Paid, each with its count, sharing the width equally. */
+@Composable
+private fun StatusTabs(selected: Int, counts: List<Int>, onSelect: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(3.dp)) {
+        BillFilter.entries.forEachIndexed { index, f ->
+            val on = index == selected
+            Column(
+                Modifier.weight(1f).pressable(if (on) null else ({ onSelect(index) }), pressScale = 0.96f)
+                    .then(if (on) Modifier.softShadow(RoundedCornerShape(10.dp)) else Modifier)
+                    .clip(RoundedCornerShape(10.dp)).background(if (on) Rf.Lowest else Color.Transparent)
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(f.label, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = if (on) Rf.Primary else Rf.OnSurfaceVariant)
+                Text("${counts[index]}", style = RfType.LabelSm.copy(fontSize = 10.sp), color = if (on) Rf.Primary else Rf.OnSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** A filter that is on; tapping it takes it off. [plain] is a link-like chip without the cross. */
+@Composable
+private fun FilterChip(label: String, plain: Boolean = false, onClick: () -> Unit) {
+    Pill(
+        label,
+        background = if (plain) Rf.Lowest else Rf.PrimaryFixed,
+        content = Rf.Primary,
+        trailingIcon = if (plain) null else Lucide.X,
+        style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold),
+        horizontal = 10.dp, vertical = 5.dp,
+        modifier = Modifier.pressable(onClick).then(if (plain) Modifier.border(1.dp, Rf.OutlineVariant, CircleShape) else Modifier)
+    )
+}
+
+/* ------------------------------ Bills ------------------------------ */
+
+/** The web's phone bill card: who, status, total, received and due, and how much is covered. */
+@Composable
+private fun BillCard(bill: BillDto, showMonth: Boolean, onOpen: () -> Unit) {
+    val name = bill.tenant?.fullName?.ifBlank { null } ?: "Tenant"
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp), spacing = 10.dp, onClick = onOpen) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            InitialsCircle(name)
+            Column(Modifier.weight(1f)) {
+                Text(name, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOfNotNull(
+                        monthLabel(bill.monthYear).takeIf { showMonth },
+                        bill.room?.roomNumber?.let { "Room $it" },
+                        bill.property?.propertyName
+                    ).joinToString(" • "),
+                    style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Box(Modifier.padding(top = 6.dp)) { BillStatusPills(bill) }
+            }
+        }
+        Column {
+            Text(inr(bill.totalDue), style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+            Text(
+                buildAnnotatedString {
+                    append("Received ${inr(bill.paidAmount)}")
+                    when {
+                        bill.pendingAmount > 0 -> {
+                            append(" • ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Rf.Error)) { append("Due ${inr(bill.pendingAmount)}") }
+                        }
+                        bill.advanceAmount > 0 -> append(" • ${inr(bill.advanceAmount)} advance")
+                    }
+                },
+                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 2.dp)
+            )
+            CoverBar(bill, 5.dp, Modifier.padding(top = 7.dp))
+            CreditNote(bill)
+        }
+    }
+}
+
+@Composable
+private fun InitialsCircle(name: String) {
+    Box(Modifier.size(36.dp).clip(CircleShape).background(Rf.PrimaryFixed), contentAlignment = Alignment.Center) {
+        Text(initials(name), style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Primary)
+    }
+}
+
+/** Paid / Partial / Pending, Overdue from an earlier month, and any advance paid on it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun BillStatusPills(bill: BillDto) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        val bold = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+        when (bill.paymentStatus) {
+            "paid" -> Pill("Paid", Rf.MintSoft, Rf.Secondary, dot = true, style = bold, vertical = 3.dp)
+            "partial" -> Pill("Partial", Rf.AmberSoft, Rf.Amber, dot = true, style = bold, vertical = 3.dp)
+            else -> Pill("Pending", Rf.Low, Rf.OnSurfaceVariant, style = bold, vertical = 3.dp)
+        }
+        if (bill.isOverdue) Pill("Overdue", Rf.ErrorContainer, Rf.Error, style = bold, vertical = 3.dp)
+        if (bill.advanceAmount > 0) Pill("+${inr(bill.advanceAmount)} advance", Rf.PrimaryFixed, Rf.Primary, style = bold, vertical = 3.dp)
+    }
+}
+
+/** How much of a bill is covered: advance used (indigo), then money received (green). */
+@Composable
+internal fun CoverBar(bill: BillDto, height: Dp, modifier: Modifier = Modifier) {
+    val total = max(bill.totalDue, 0.0)
+    val credit = min(bill.creditApplied, total)
+    val paid = min(bill.paidAmount, max(total - credit, 0.0))
+    val rest = max(total - credit - paid, 0.0)
+    Row(modifier.fillMaxWidth().height(height).clip(CircleShape).background(Rf.Container)) {
+        if (total <= 0) return@Row
+        if (credit > 0) Box(Modifier.weight(credit.toFloat()).fillMaxHeight().background(Rf.Primary))
+        if (paid > 0) Box(Modifier.weight(paid.toFloat()).fillMaxHeight().background(Rf.Secondary))
+        if (rest > 0) Box(Modifier.weight(rest.toFloat()).fillMaxHeight())
+    }
+}
+
+/** Advance from earlier bills used on this one, as a small indigo line. */
+@Composable
+private fun CreditNote(bill: BillDto) {
+    if (bill.creditApplied <= 0) return
+    Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        LIcon(Lucide.Wallet, size = 12.dp, tint = Rf.Primary)
+        Text("${inr(bill.creditApplied)} from advance", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
+    }
+}
+
+/* ------------------------------ Not billed ------------------------------ */
+
+@Composable
+private fun NotBilledCard(tenants: List<TenantDto>, month: YearMonth, open: Boolean, onToggle: () -> Unit) {
+    RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${tenants.size} ${if (tenants.size == 1) "tenant has" else "tenants have"} no bill for ${month.label()}",
+                    style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface
+                )
+                Text("They live in a room, but nothing has been billed yet.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+            }
+            Text(
+                if (open) "Hide" else "Review", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary,
+                modifier = Modifier.pressable(onToggle).clip(RoundedCornerShape(9.dp)).background(Rf.Low).padding(horizontal = 12.dp, vertical = 8.dp)
+            )
+        }
+        if (open) {
+            tenants.forEach { tenant ->
+                HorizontalDivider(thickness = 1.dp, color = Rf.Low, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    InitialsCircle(tenant.fullName)
+                    Column(Modifier.weight(1f)) {
+                        Text(tenant.fullName, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            listOfNotNull(tenant.room?.roomNumber?.let { "Room $it" }, tenant.property?.propertyName).joinToString(" • "),
+                            style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ------------------------------ Sheets ------------------------------ */
+
+private val MonthNames = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+/** The year's months in a grid, with the year to step through; no future months. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthSheet(month: YearMonth, onPick: (YearMonth) -> Unit, onDismiss: () -> Unit) {
+    val now = YearMonth.now()
+    var year by remember { mutableIntStateOf(month.year) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Rf.Lowest,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Choose month", style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, modifier = Modifier.weight(1f))
+                StepArrow(Lucide.ArrowLeft, "Previous year", enabled = true) { year-- }
+                Text("$year", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, modifier = Modifier.padding(horizontal = 8.dp))
+                StepArrow(Lucide.ArrowRight, "Next year", enabled = year < now.year) { year++ }
+            }
+            MonthNames.chunked(4).forEachIndexed { row, names ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    names.forEachIndexed { col, name ->
+                        val candidate = YearMonth.of(year, row * 4 + col + 1)
+                        val future = candidate > now
+                        val on = candidate == month
+                        Text(
+                            name, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), textAlign = TextAlign.Center,
+                            color = when {
+                                on -> Rf.OnPrimary
+                                future -> Rf.OutlineVariant
+                                else -> Rf.OnSurface
+                            },
+                            modifier = Modifier.weight(1f)
+                                .pressable(if (future) null else ({
+                                    onPick(candidate)
+                                    onDismiss()
+                                }))
+                                .clip(RoundedCornerShape(10.dp)).background(if (on) Rf.Primary else Rf.Low).padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Every property, with "All properties" first; the chosen one is ticked. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PropertySheet(properties: List<PropertyDto>, selected: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Rf.Lowest,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Property", style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, modifier = Modifier.padding(bottom = 6.dp))
+            PropertyRow("All properties", selected == null) { onPick(null) }
+            properties.forEach { property -> PropertyRow(property.propertyName, property.id == selected) { onPick(property.id) } }
+        }
+    }
+}
+
+@Composable
+private fun PropertyRow(name: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().pressable(onClick, pressScale = 0.98f).clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Rf.PrimaryFixed else Color.Transparent).padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        LIcon(Lucide.Building2, size = 17.dp, tint = if (selected) Rf.Primary else Rf.OnSurfaceVariant)
+        Text(name, style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = if (selected) Rf.Primary else Rf.OnSurface, modifier = Modifier.weight(1f))
+        if (selected) LIcon(Lucide.Check, size = 17.dp, tint = Rf.Primary)
+    }
+}
+
+/* ------------------------------ Bill details ------------------------------ */
+
+/** One bill in full, as the web's bill drawer on a phone: totals, breakdown, payment and files. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var viewing by remember { mutableStateOf<String?>(null) }
+    val total = bill.totalDue
+    val settled = min(bill.paidAmount + bill.creditApplied, total)
+    val percent = if (total > 0) (settled / total * 100).roundToInt() else 100
+    val month = parseApiMonth(bill.monthYear)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Rf.Lowest,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // The bill's month as a small calendar leaf
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.width(48.dp).softShadow(RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp)).background(Rf.Lowest)) {
+                    Text(
+                        month?.month?.let { MonthNames[it.value - 1].uppercase() } ?: "—",
+                        style = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnPrimary, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().background(Rf.Primary).padding(vertical = 2.dp)
+                    )
+                    Text(
+                        "${month?.year ?: ""}", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
+                    )
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("${monthLabel(bill.monthYear)} bill", style = RfType.BodyLg.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                    BillStatusPills(bill)
+                    Text(
+                        listOfNotNull(bill.tenant?.fullName, bill.room?.roomNumber?.let { "Room $it" }, bill.property?.propertyName).joinToString(" • "),
+                        style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+                    )
+                }
+                Box(Modifier.size(32.dp).pressable(onDismiss).clip(RoundedCornerShape(10.dp)).background(Rf.Low), contentAlignment = Alignment.Center) {
+                    LIcon(Lucide.X, size = 16.dp, tint = Rf.OnSurfaceVariant, contentDescription = "Close")
+                }
+            }
+
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
+                    Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
+                    Figure("Still due", inr(bill.pendingAmount), if (bill.pendingAmount > 0) Rf.Error else Rf.Secondary, Modifier.weight(1f))
+                }
+                CoverBar(bill, 6.dp, Modifier.padding(top = 10.dp))
+                Row(Modifier.padding(top = 6.dp)) {
+                    Text("$percent% collected", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f))
+                    when {
+                        bill.advanceAmount > 0 -> Text("${inr(bill.advanceAmount)} extra kept as advance", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
+                        bill.pendingAmount > 0 -> Text("${inr(bill.pendingAmount)} left", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Error)
+                        else -> Text("Fully paid", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Secondary)
+                    }
+                }
+            }
+
+            InfoBox("Breakdown") {
+                InfoRow("Rent", inr(bill.rent), first = true)
+                bill.electricity?.let { meter ->
+                    InfoRow(
+                        "Electricity", inr(meter.amount),
+                        sub = "${plainNumber(meter.previousReading)} → ${plainNumber(meter.currentReading)} kWh • ${plainNumber(meter.unitsConsumed)} units × ${inr(meter.ratePerUnit)}"
+                    )
+                }
+                bill.otherCharges.forEach { InfoRow(it.name, inr(it.amount)) }
+                InfoRow("Total due", inr(bill.totalDue), strong = true)
+                if (bill.creditApplied > 0) {
+                    val from = bill.creditSources.map { monthLabel(it.monthYear) }.distinct().joinToString(", ")
+                    InfoRow(if (from.isNotEmpty()) "Advance used (from $from)" else "Advance used", "− ${inr(bill.creditApplied)}", labelColor = Rf.Primary)
+                    InfoRow("To pay", inr(max(bill.totalDue - bill.creditApplied, 0.0)), strong = true)
+                }
+            }
+
+            InfoBox("Payment") {
+                InfoRow("Received", if (bill.paidAmount > 0) inr(bill.paidAmount) else "Nothing yet", first = true, valueColor = if (bill.paidAmount > 0) Rf.Secondary else null)
+                if (bill.paidAmount > 0) {
+                    InfoRow("Method", methodLabel(bill.paymentMethod))
+                    InfoRow("Date", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
+                }
+                bill.notes?.takeIf(String::isNotBlank)?.let { InfoRow("Notes", it) }
+            }
+
+            if (bill.advanceAmount > 0) {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rf.PrimaryFixed).padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    LIcon(Lucide.Wallet, size = 18.dp, tint = Rf.Primary)
+                    Column(Modifier.weight(1f)) {
+                        Text("${inr(bill.advanceAmount)} advance", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Primary)
+                        Text(
+                            if (bill.advanceLeft > 0) "Paid beyond this bill. ${inr(bill.advanceLeft)} is kept for the next bills."
+                            else "Paid beyond this bill and already used by later bills.",
+                            style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            val meterPhoto = bill.electricity?.meterPhoto
+            val proof = bill.paymentProof
+            if (meterPhoto != null || proof != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Caps("Attachments")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        meterPhoto?.let { AttachmentTile("Meter photo", it, Modifier.weight(1f)) { url -> open(context, url) { viewing = it } } }
+                        proof?.let { AttachmentTile("Payment proof", it, Modifier.weight(1f)) { url -> open(context, url) { viewing = it } } }
+                        if (meterPhoto == null || proof == null) Box(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+    viewing?.let { url -> PhotoViewer(listOf(Photo.Stored("", url)), 0, onClose = { viewing = null }) }
+}
+
+/** A PDF opens in the phone's viewer; a photo opens full screen through [onPhoto]. */
+private fun open(context: android.content.Context, url: String, onPhoto: (String) -> Unit) {
+    if (isPdfLink(url)) runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } else onPhoto(url)
+}
+
+private fun plainNumber(value: Double): String =
+    if (value % 1.0 == 0.0) "%,d".format(value.toLong()) else "%,.2f".format(value)
+
+@Composable
+private fun Figure(label: String, value: String, color: Color, modifier: Modifier) {
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(10.dp)) {
+        Caps(label)
+        Text(value, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = color, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+@Composable
+private fun InfoBox(title: String, rows: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Rf.Low, RoundedCornerShape(14.dp))) {
+        Box(Modifier.fillMaxWidth().background(Rf.Low).padding(horizontal = 12.dp, vertical = 8.dp)) { Caps(title) }
+        rows()
+    }
+}
+
+@Composable
+private fun InfoRow(
+    label: String,
+    value: String,
+    first: Boolean = false,
+    sub: String? = null,
+    strong: Boolean = false,
+    labelColor: Color? = null,
+    valueColor: Color? = null
+) {
+    if (!first) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                label, style = RfType.LabelMd.copy(fontWeight = if (strong) FontWeight.Bold else FontWeight.Medium),
+                color = labelColor ?: if (strong) Rf.OnSurface else Rf.OnSurfaceVariant
+            )
+            if (sub != null) Text(sub, style = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+        }
+        Text(
+            value, style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = valueColor ?: Rf.OnSurface,
+            textAlign = TextAlign.End, modifier = Modifier.weight(1f, fill = false)
+        )
+    }
+}
+
+/** A saved meter photo or payment proof; a PDF shows as a file. */
+@Composable
+private fun AttachmentTile(label: String, url: String, modifier: Modifier, onOpen: (String) -> Unit) {
+    Box(modifier.height(96.dp).pressable({ onOpen(url) }, pressScale = 0.97f).clip(RoundedCornerShape(12.dp)).background(Rf.Low)) {
+        if (isPdfLink(url)) {
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                LIcon(Lucide.FileText, size = 26.dp, tint = Rf.Error)
+                Text("PDF", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.OnSurface, modifier = Modifier.padding(top = 4.dp))
+            }
+        } else {
+            RemoteImage(url, Modifier.fillMaxSize(), placeholderIcon = Lucide.Image, iconSize = 22.dp)
+        }
+        Text(
+            label, style = RfType.LabelSm.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold), color = Color.White,
+            modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(6.dp))
+                .background(Rf.InverseSurface.copy(alpha = 0.7f)).padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}

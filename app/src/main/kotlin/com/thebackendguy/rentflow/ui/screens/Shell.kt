@@ -25,24 +25,26 @@ import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 
 val TenantTabs = listOf(NavTab("Home", Lucide.House), NavTab("Payments", Lucide.History), NavTab("Profile", Lucide.User))
-/** The web's phone bottom bar. Payments joins when its screens are built; Profile opens from the photo and the menu. */
+/** The web's phone bottom bar; Profile opens from the photo and the menu. */
 val LandlordTabs = listOf(
     NavTab("Overview", Lucide.LayoutDashboard),
     NavTab("Properties", Lucide.Building2),
     NavTab("Rooms", Lucide.DoorOpen),
-    NavTab("Tenants", Lucide.Users)
+    NavTab("Tenants", Lucide.Users),
+    NavTab("Payments", Lucide.WalletCards)
 )
 
 /**
- * The web's sidebar, in its order and words. The first four open the tabs above;
- * the rest have no screen in the app yet, so (like the web's placeholders) they do nothing.
+ * The web's sidebar, in its order and words. The first five open the tabs above
+ * (Rent Collection is the Payments tab); the rest have no screen in the app yet,
+ * so (like the web's placeholders) they do nothing.
  */
 val LandlordMenu = listOf(
     NavTab("Dashboard", Lucide.LayoutDashboard),
     NavTab("Properties", Lucide.Building2),
     NavTab("Rooms", Lucide.DoorOpen),
     NavTab("Tenants", Lucide.Users),
-    NavTab("Rent Collection", Lucide.WalletCards, placeholder = true),
+    NavTab("Rent Collection", Lucide.WalletCards),
     NavTab("Rent History", Lucide.History, placeholder = true),
     NavTab("Rent Settings", Lucide.SlidersHorizontal, placeholder = true),
     NavTab("Expenses", Lucide.Receipt, placeholder = true),

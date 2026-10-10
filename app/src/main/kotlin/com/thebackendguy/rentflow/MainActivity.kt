@@ -68,6 +68,7 @@ import com.thebackendguy.rentflow.ui.screens.landlord.PropertiesScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.PropertyDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.PropertyFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomDetailsScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.RentCollectionScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RoomsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantDetailsScreen
@@ -89,7 +90,7 @@ private enum class Screen {
     Login, ForgotPassword, Register,
     TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
     LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
-    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, LandlordProfile, EditProfile, ChangePassword
+    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, LandlordProfile, EditProfile, ChangePassword
 }
 
 /** One entry of the back stack: a screen and the ids it shows (see each screen in [RentFlowApp]). */
@@ -105,7 +106,7 @@ private val StackSaver = listSaver<List<Route>, String>(save = { stack -> stack.
 
 private val AuthScreens = setOf(Screen.Login, Screen.ForgotPassword, Screen.Register)
 private val TenantTabScreens = listOf(Screen.TenantHome, Screen.PaymentHistory, Screen.TenantProfile)
-private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Rooms, Screen.Tenants)
+private val LandlordTabScreens = listOf(Screen.LandlordOverview, Screen.Properties, Screen.Rooms, Screen.Tenants, Screen.RentCollection)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -475,6 +476,8 @@ private fun RentFlowApp() {
                             onBack = ::back,
                             onDone = ::back
                         )
+
+                        Screen.RentCollection -> RentCollectionScreen(shell = shell)
 
                         Screen.LandlordProfile -> LandlordProfileScreen(
                             user = user,

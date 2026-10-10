@@ -3,13 +3,14 @@ package com.thebackendguy.rentflow.data.remote
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Every API reply: `{ status, message, data, count, token }`. */
+/** Every API reply: `{ status, message, data, count, token }`; bill lists also carry `summary`. */
 @Serializable
 data class ApiEnvelope<T>(
     val status: Boolean = false,
     val message: String? = null,
     val data: T? = null,
     val count: Int? = null,
+    val summary: BillTotalsDto? = null,
     val token: String? = null
 )
 
