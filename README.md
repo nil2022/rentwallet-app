@@ -102,7 +102,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 
 | Remove from room | Delete | Loading | Empty | Can’t connect |
 |:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/sheet-end-lease.png" width="135" alt="Remove from room confirmation"> | <img src="docs/screenshots/sheet-delete-property.png" width="135" alt="Delete property confirmation"> | <img src="docs/screenshots/state-loading.png" width="135" alt="Loading"> | <img src="docs/screenshots/state-empty.png" width="135" alt="Empty list"> | <img src="docs/screenshots/state-error.png" width="135" alt="Error with retry"> |
+| <img src="docs/screenshots/sheet-remove-from-room.png" width="135" alt="Remove from room confirmation"> | <img src="docs/screenshots/sheet-delete-property.png" width="135" alt="Delete property confirmation"> | <img src="docs/screenshots/state-loading.png" width="135" alt="Loading"> | <img src="docs/screenshots/state-empty.png" width="135" alt="Empty list"> | <img src="docs/screenshots/state-error.png" width="135" alt="Error with retry"> |
 | Says what happens before a tenant leaves a room. | Deletes ask first. A property or room with tenants can’t be deleted until they are removed from it. | Placeholders that pulse, as on the web, in the shape of what is loading. | A first-time landlord sees what to add first. | The reason and a “Try again” button. |
 
 After every save or delete, a short message such as “Property saved” floats up from the bottom.
