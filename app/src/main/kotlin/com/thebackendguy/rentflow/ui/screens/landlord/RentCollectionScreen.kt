@@ -901,13 +901,13 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                             if (bill.electricity != null) {
                                 AttachmentSlot(
                                     "Meter photo", bill.electricity.meterPhoto, allowPdf = false, busy = saving == "photo", modifier = Modifier.weight(1f),
-                                    onOpen = { url -> open(context, url) { viewing = it } }, onPick = { saveFile("photo", it) }, onRemove = { saveFile("photo", null) }
+                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveFile("photo", it) }, onRemove = { saveFile("photo", null) }
                                 )
                             }
                             if (showProof) {
                                 AttachmentSlot(
                                     "Payment proof", bill.paymentProof, allowPdf = true, busy = saving == "proof", modifier = Modifier.weight(1f),
-                                    onOpen = { url -> open(context, url) { viewing = it } }, onPick = { saveFile("proof", it) }, onRemove = { saveFile("proof", null) }
+                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveFile("proof", it) }, onRemove = { saveFile("proof", null) }
                                 )
                             }
                             if (bill.electricity == null || !showProof) Box(Modifier.weight(1f))
@@ -960,7 +960,7 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
 }
 
 /** A PDF opens in the phone's viewer; a photo opens full screen through [onPhoto]. */
-private fun open(context: android.content.Context, url: String, onPhoto: (String) -> Unit) {
+internal fun openAttachment(context: android.content.Context, url: String, onPhoto: (String) -> Unit) {
     if (isPdfLink(url)) runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } else onPhoto(url)
 }
 
@@ -976,11 +976,11 @@ private fun SheetButton(label: String, icon: LucideIcon, background: Color, cont
     }
 }
 
-private fun plainNumber(value: Double): String =
+internal fun plainNumber(value: Double): String =
     if (value % 1.0 == 0.0) "%,d".format(value.toLong()) else "%,.2f".format(value)
 
 @Composable
-private fun Figure(label: String, value: String, color: Color, modifier: Modifier) {
+internal fun Figure(label: String, value: String, color: Color, modifier: Modifier) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(10.dp)) {
         Caps(label)
         Text(value, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = color, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
@@ -988,7 +988,7 @@ private fun Figure(label: String, value: String, color: Color, modifier: Modifie
 }
 
 @Composable
-private fun InfoBox(title: String, rows: @Composable () -> Unit) {
+internal fun InfoBox(title: String, rows: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Rf.Low, RoundedCornerShape(14.dp))) {
         Box(Modifier.fillMaxWidth().background(Rf.Low).padding(horizontal = 12.dp, vertical = 8.dp)) { Caps(title) }
         rows()
@@ -996,7 +996,7 @@ private fun InfoBox(title: String, rows: @Composable () -> Unit) {
 }
 
 @Composable
-private fun InfoRow(
+internal fun InfoRow(
     label: String,
     value: String,
     first: Boolean = false,

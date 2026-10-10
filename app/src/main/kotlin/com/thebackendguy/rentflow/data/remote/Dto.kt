@@ -33,7 +33,8 @@ data class UserDto(
 )
 
 @Serializable
-data class LoginBody(val email: String, val password: String)
+/** One of [email] or [mobile] (tenants may sign in with either); the other stays null and is not sent. */
+data class LoginBody(val email: String? = null, val mobile: String? = null, val password: String)
 
 @Serializable
 data class EmailBody(val email: String)

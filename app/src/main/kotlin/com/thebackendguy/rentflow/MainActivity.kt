@@ -41,14 +41,13 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.thebackendguy.rentflow.data.AuthRepository
-import com.thebackendguy.rentflow.data.Demo
 import com.thebackendguy.rentflow.data.apiMonth
 import com.thebackendguy.rentflow.data.LandlordStore
+import com.thebackendguy.rentflow.data.TenantStore
 import com.thebackendguy.rentflow.data.NotificationStore
 import com.thebackendguy.rentflow.data.UserRole
 import com.thebackendguy.rentflow.data.remote.Network
 import com.thebackendguy.rentflow.data.session.SessionStore
-import com.thebackendguy.rentflow.data.settled
 import com.thebackendguy.rentflow.push.Notifications
 import com.thebackendguy.rentflow.ui.components.AppDrawer
 import com.thebackendguy.rentflow.ui.components.SystemBars
@@ -79,10 +78,8 @@ import com.thebackendguy.rentflow.ui.screens.landlord.RoomsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantDetailsScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantFormScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.TenantsScreen
-import com.thebackendguy.rentflow.ui.screens.tenant.PayRentScreen
-import com.thebackendguy.rentflow.ui.screens.tenant.PaymentHistoryScreen
-import com.thebackendguy.rentflow.ui.screens.tenant.PaymentSuccessScreen
-import com.thebackendguy.rentflow.ui.screens.tenant.ReceiptScreen
+import com.thebackendguy.rentflow.ui.screens.tenant.TenantBillScreen
+import com.thebackendguy.rentflow.ui.screens.tenant.TenantBillsScreen
 import com.thebackendguy.rentflow.ui.screens.tenant.TenantHomeScreen
 import com.thebackendguy.rentflow.ui.screens.tenant.TenantProfileScreen
 import com.thebackendguy.rentflow.ui.theme.DarkPalette
@@ -94,7 +91,7 @@ import java.time.YearMonth
 
 private enum class Screen {
     Login, ForgotPassword, Register,
-    TenantHome, PayRent, PaymentSuccess, PaymentHistory, Receipt, TenantProfile,
+    TenantHome, PaymentHistory, TenantBill, TenantProfile,
     LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
     Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, RentHistory, PickBillTenant, RecordPayment, LandlordProfile, ChangePassword
 }
@@ -168,11 +165,8 @@ private fun RentFlowApp() {
     }
     // Login starts on the role used last time (Landlord the first time)
     var role by rememberSaveable { mutableStateOf(saved?.user?.role ?: SessionStore.lastRole) }
-    // Payments the tenant has made in this session, by index into the demo list
-    var paidIndexes by rememberSaveable { mutableStateOf(listOf<Int>()) }
 
     val route = stack.last()
-    val payments = Demo.tenantPayments.mapIndexed { i, p -> if (i in paidIndexes) p.settled() else p }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -197,13 +191,14 @@ private fun RentFlowApp() {
     fun enterApp(signedInAs: UserRole) {
         role = signedInAs
         LandlordStore.clear()
+        TenantStore.clear()
         NotificationStore.clear()
         stack = listOf(Route(homeFor(signedInAs)))
     }
 
     fun signOut() {
-        paidIndexes = emptyList()
         LandlordStore.clear()
+        TenantStore.clear()
         NotificationStore.clear()
         stack = listOf(Route(Screen.Login))
         scope.launch { AuthRepository.logout() }
@@ -247,8 +242,8 @@ private fun RentFlowApp() {
     LaunchedEffect(session == null, isSignedInScreen) {
         if (session == null && isSignedInScreen) {
             drawerState.close()
-            paidIndexes = emptyList()
             LandlordStore.clear()
+            TenantStore.clear()
             NotificationStore.clear()
             stack = listOf(Route(Screen.Login))
         }
@@ -332,49 +327,25 @@ private fun RentFlowApp() {
                             onRegistered = { enterApp(UserRole.Landlord) }
                         )
 
-                        /* ---------- Tenant (rent and payments are sample data) ---------- */
+                        /* ---------- Tenant (their own bills) ---------- */
                         Screen.TenantHome -> TenantHomeScreen(
                             firstName = user?.firstName.orEmpty(),
-                            payments = payments,
                             shell = shell,
-                            onPayRent = { go(Screen.PayRent, "0") },
-                            onOpenReceipt = { go(Screen.Receipt, "$it") },
-                            onOpenHistory = { openTab(Screen.PaymentHistory) },
-                            onOpenProfile = { openTab(Screen.TenantProfile) }
+                            onOpenBill = { go(Screen.TenantBill, it) },
+                            onOpenBills = { openTab(Screen.PaymentHistory) }
                         )
 
-                        Screen.PayRent -> {
-                            val index = a?.toIntOrNull() ?: 0
-                            PayRentScreen(
-                                payment = payments[index],
-                                shell = shell,
-                                onBack = ::back,
-                                onConfirm = {
-                                    paidIndexes = (paidIndexes + index).distinct()
-                                    replace(Screen.PaymentSuccess, "$index")
-                                }
-                            )
-                        }
+                        Screen.PaymentHistory -> TenantBillsScreen(shell = shell, onOpenBill = { go(Screen.TenantBill, it) })
 
-                        Screen.PaymentSuccess -> {
-                            val index = a?.toIntOrNull() ?: 0
-                            PaymentSuccessScreen(
-                                payment = payments[index],
-                                onBackToDashboard = { openTab(Screen.TenantHome) },
-                                onViewReceipt = { replace(Screen.Receipt, "$index") }
-                            )
-                        }
+                        // a = bill id
+                        Screen.TenantBill -> TenantBillScreen(billId = a.orEmpty(), shell = shell, onBack = ::back)
 
-                        Screen.PaymentHistory -> PaymentHistoryScreen(
-                            payments = payments,
+                        Screen.TenantProfile -> TenantProfileScreen(
+                            user = user,
                             shell = shell,
-                            onOpenReceipt = { go(Screen.Receipt, "$it") },
-                            onPay = { go(Screen.PayRent, "$it") }
+                            onChangePassword = { go(Screen.ChangePassword) },
+                            onLogout = ::signOut
                         )
-
-                        Screen.Receipt -> ReceiptScreen(payment = payments[a?.toIntOrNull() ?: 0], shell = shell, onBack = ::back)
-
-                        Screen.TenantProfile -> TenantProfileScreen(user = user, shell = shell, onLogout = ::signOut)
 
                         /* ---------- Landlord ---------- */
                         Screen.LandlordOverview -> LandlordOverviewScreen(
@@ -546,7 +517,11 @@ private fun RentFlowApp() {
                             }
                         )
 
-                        Screen.ChangePassword -> ChangePasswordScreen(shell = shell, onBack = ::back)
+                        Screen.ChangePassword -> ChangePasswordScreen(
+                            shell = shell,
+                            onBack = ::back,
+                            change = if (role == UserRole.Tenant) TenantStore::changePassword else LandlordStore::changePassword
+                        )
                     }
                 }
             }

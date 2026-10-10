@@ -497,8 +497,13 @@ private fun AccountRow(label: String, value: String?, first: Boolean = false, ok
 /** The web's rule for a new password (the API's changePasswordSchema). */
 private const val MIN_PASSWORD = 6
 
+/** [change] saves the new password: the landlord's endpoint by default, the tenant's for a tenant. */
 @Composable
-fun ChangePasswordScreen(shell: Shell, onBack: () -> Unit) {
+fun ChangePasswordScreen(
+    shell: Shell,
+    onBack: () -> Unit,
+    change: suspend (String, String) -> ApiResult<Unit> = LandlordStore::changePassword
+) {
     val scope = rememberCoroutineScope()
     var current by rememberSaveable { mutableStateOf("") }
     var next by rememberSaveable { mutableStateOf("") }
@@ -517,7 +522,7 @@ fun ChangePasswordScreen(shell: Shell, onBack: () -> Unit) {
         if (!ready || saving) return
         saving = true
         scope.launch {
-            val result = LandlordStore.changePassword(current, next)
+            val result = change(current, next)
             saving = false
             if (result.announce("Password changed")) onBack()
         }

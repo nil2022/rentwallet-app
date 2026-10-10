@@ -26,8 +26,12 @@ object AuthRepository {
 
     private fun String.normalized() = trim().lowercase()
 
-    suspend fun login(role: UserRole, email: String, password: String, remember: Boolean): ApiResult<Unit> =
-        signIn(role, remember) { api.login(role.apiPath, LoginBody(email.normalized(), password)) }
+    /** [id] is an email, or for a tenant a mobile number (the API accepts either for tenants). */
+    suspend fun login(role: UserRole, id: String, password: String, remember: Boolean): ApiResult<Unit> {
+        val body = if (role == UserRole.Tenant && !id.contains('@')) LoginBody(mobile = mobileDigits(id), password = password)
+        else LoginBody(email = id.normalized(), password = password)
+        return signIn(role, remember) { api.login(role.apiPath, body) }
+    }
 
     suspend fun sendLoginCode(role: UserRole, email: String): ApiResult<Unit> =
         apiCall { api.sendOtp(role.apiPath, EmailBody(email.normalized()), null) }.discard()

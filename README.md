@@ -5,11 +5,11 @@
 <h1 align="center">RentFlow for Android</h1>
 
 <p align="center">
-  A rent app for tenants and landlords. Landlords manage properties, rooms and the tenants living in them; tenants pay rent and keep receipts.<br>
+  A rent app for tenants and landlords. Landlords manage properties, rooms and the tenants living in them; tenants see their bills and what they have paid.<br>
   Built with Kotlin and Jetpack Compose, and designed to match the RentFlow web app’s phone layout.
 </p>
 
-> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. So do the tenants’ payment statuses on the Tenants tab and every figure on Overview and Profile. The wallet and the tenant’s rent screens still show **sample numbers** (see [What’s next](#whats-next)).
+> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. So do the tenants’ payment statuses on the Tenants tab, every figure on Overview and Profile, and the tenant’s own app (Home, Payments, bill details, Profile). Nothing shows sample numbers any more.
 
 ## Contents
 
@@ -34,7 +34,7 @@ The app opens on Login, on the role used for the last sign-in (Landlord the firs
 | 02 Login: Tenant | 02 Login: Landlord | 02 Login: One-time code |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/02-login-tenant.png" width="170" alt="Tenant login"> | <img src="docs/screenshots/02-login-landlord.png" width="170" alt="Landlord login"> | <img src="docs/screenshots/02-login-otp.png" width="170" alt="Login with one-time code"> |
-| One login for both roles. Email and password, with “Remember for 30 days”. | The switch changes the headline, subtitle and the “Register here” link. | “Login with OTP instead” emails a 6-digit code. Resend unlocks after 60 seconds. |
+| One login for both roles. Email and password, with “Remember for 30 days”. Tenants may type their mobile number instead of the email. | The switch changes the headline, subtitle and the “Register here” link. | “Login with OTP instead” emails a 6-digit code. Resend unlocks after 60 seconds. |
 
 A wrong password or code floats up from the bottom as a red note. Buttons show a spinner while a request runs.
 
@@ -99,17 +99,16 @@ After every save or delete, a short message such as “Property saved” floats 
 
 ### Tenant
 
-| 03 Home | 04 Pay Rent | 05 Payment Success |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/03-tenant-home.png" width="220" alt="Tenant home"> | <img src="docs/screenshots/04-pay-rent.png" width="220" alt="Pay rent"> | <img src="docs/screenshots/05-payment-success.png" width="220" alt="Payment successful"> |
-| This month’s rent with a Pay rent button, quick actions, lease tiles, alerts and recent payments. | Rent details, payment method and summary. Confirm sits in a bottom sheet. | Confirmation with the transaction details. Links to the receipt. |
+A tenant sees only their own bills (`/tenant/payment`), which their landlord records; the app takes no payments. [Design mockup](https://claude.ai/artifact/3fTPD42D4YqiH8xnfyT8UK); the screenshots below are the older design.
 
-| 06 Payment History | 07 Receipt | 08 Profile |
+| 03 Home | 06 Payments | 08 Profile |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/06-payment-history.png" width="220" alt="Payment history"> | <img src="docs/screenshots/07-receipt.png" width="220" alt="Receipt details"> | <img src="docs/screenshots/08-tenant-profile.png" width="220" alt="Tenant profile"> |
-| Year summary, counts and every payment, filtered by All, Paid, Pending or Failed. | One receipt card with the transaction and wallet status. | Real name, email and mobile; rent and lease rows are sample data. Log out. |
+| <img src="docs/screenshots/03-tenant-home.png" width="220" alt="Tenant home"> | <img src="docs/screenshots/06-payment-history.png" width="220" alt="Payments"> | <img src="docs/screenshots/08-tenant-profile.png" width="220" alt="Tenant profile"> |
+| This month’s bill on an indigo card: still due (or paid), a bar of how much is covered, received of total, the room, and View bill. A red line for earlier months still unpaid, any advance held, a note on how to pay (cash, UPI or cheque to the landlord), all-time totals and the three latest bills. | Every bill, newest first, with Billed, Received and Still due, and All / Pending / Partial / Paid. Earlier months still unpaid say Overdue. | Read-only, as on the web: photo, name, mobile, email, and the room and property from the newest bill. Change Password (the landlord’s screen and rules) and Log out. |
 
-The tenant’s rent screens use sample data until the tenant payment and lease APIs exist.
+**Bill details** (replaces the Receipt) shows one bill as the landlord’s bill sheet does, without Collect, Edit or Delete: totals and how much is paid, rent, electricity with the readings, other charges, advance used, the payment’s method and date, any advance kept for later bills, and the meter photo and payment proof (a PDF opens in the phone’s viewer).
+
+Tenants sign in with their email or their mobile number and password; “Login with OTP” uses the email.
 
 ## App flow
 
@@ -124,12 +123,11 @@ flowchart TD
     R2 --> LO
 
     subgraph Tenant
-        TH["03 Home"] -->|"Pay rent"| PR["04 Pay Rent"]
-        PR -->|"Confirm Payment"| PS["05 Payment Success"]
-        PS -->|"View receipt"| RC["07 Receipt"]
-        TH -->|"Payments tab"| PH["06 Payment History"]
-        PH -->|"Tap a payment"| RC
+        TH["03 Home"] -->|"View bill"| TB["Bill details"]
+        TH -->|"Payments tab"| PH["06 Payments"]
+        PH -->|"Tap a bill"| TB
         TH -->|"Profile tab"| TP["08 Profile"]
+        TP -->|"Change password"| TCP["25 Change Password"]
     end
 
     subgraph Landlord
@@ -192,8 +190,8 @@ How navigation works:
 | Rent History | Everything: monthly totals from `/landlord/payment/summary`, chart, CSV | None |
 | Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room. This month’s payment status on the list and the tenant page, and the tenant’s Payment History | None |
 | Landlord Profile | Everything: details, verified flags, last sign-in, portfolio tiles, collected this month. Edit details and photo, change password | None |
-| Tenant Profile | Name, email, mobile | Rent and lease rows |
-| Tenant Home, Pay Rent, Payments, Receipt | None yet | Everything |
+| Tenant Home, Payments, bill details | Everything: the tenant’s own bills and their totals from `/tenant/payment` | None |
+| Tenant Profile | Everything: name, email, mobile, photo, room and property from the newest bill; change password | None |
 | Bell and notifications (both roles) | Unread count, the list 20 at a time | None |
 
 Every call is one the web app already makes. The landlord endpoints are under `/api/v1/landlord` (property, room, tenant, `tenant/assign-room`, profile). Edits send the record’s id in the body, not the URL, photos go through `/api/v1/upload/presigned`, and sign-in uses `/api/v1/{landlord|tenant}/auth`. Notifications use `/api/v1/notification` and `/api/v1/notification/count`, and the phone's FCM token goes to `PUT /api/v1/fcm-token`.
@@ -250,7 +248,6 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Session | Token and account details in SharedPreferences (only with “Remember me”) |
 | Navigation | A back stack of screens in Compose state, no navigation library |
 | Push notifications | Firebase Cloud Messaging (Firebase BoM 34.19, google-services plugin 4.5) |
-| Sample data | [`DemoData.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/data/DemoData.kt) for rent, payments and wallet |
 
 ## Project structure
 
@@ -262,8 +259,9 @@ app/src/main/
 │   │   ├── AuthRepository.kt     # Sign-in, OTP, password reset, registration, log out
 │   │   ├── LandlordStore.kt      # Properties, rooms and tenants; every add, edit and delete
 │   │   ├── NotificationStore.kt  # The bell's unread count and the notification list
-│   │   ├── Labels.kt             # Floors, dates, amounts and types as the web shows them
-│   │   ├── DemoData.kt           # Sample rent, payments and wallet; ₹ formatting
+│   │   ├── Labels.kt             # Floors, dates, ₹ amounts and types as the web shows them; UserRole
+│   │   ├── PaymentStore.kt       # The landlord's bills: collection, overview, statuses, save and delete
+│   │   ├── TenantStore.kt        # The signed-in tenant's own bills and password
 │   │   ├── session/              # SessionStore: the signed-in account and token
 │   │   └── remote/               # ApiConfig (server address), Retrofit APIs, DTOs, photo uploads
 │   ├── push/                     # Firebase messaging service, notification channel, FCM token in Logcat
@@ -275,7 +273,7 @@ app/src/main/
 │           ├── Shell.kt          # Top bar and tabs per role, profile header, log out button (drawer in components/Drawer.kt)
 │           ├── NotificationsSheet.kt # The bell's bottom sheet: Today / Yesterday / Earlier, Load more
 │           ├── auth/             # Login, Forgot Password, Register
-│           ├── tenant/           # Home, Pay Rent, Payment Success, History, Receipt, Profile
+│           ├── tenant/           # Home, Payments, bill details, Profile
 │           └── landlord/         # Overview, Properties, Rooms, Tenants, room assignment, Profile
 ├── res/
 │   ├── font/plus_jakarta_sans.ttf
@@ -336,7 +334,7 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
 2. ~~**Landlord data:** properties, rooms, tenants and who lives in which room, with add, edit and delete.~~ Done.
-3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
+3. ~~**Tenant screens:** the tenant’s own bills (`/tenant/payment`), bill details, a read-only profile and sign-in with a mobile number.~~ Done. The tenant profile API returns only the room and property ids, so the app reads them from the newest bill; returning the room and property with the profile would let a tenant see them before their first bill.
 4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection, Record Payment, bill details, the tenant’s Payment History and Rent History use them; the Tenants tab, Overview and Profile use them too ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
 6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.

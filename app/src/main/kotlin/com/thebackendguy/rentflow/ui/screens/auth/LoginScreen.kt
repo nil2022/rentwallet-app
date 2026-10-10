@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.thebackendguy.rentflow.data.AuthRepository
 import com.thebackendguy.rentflow.data.UserRole
+import com.thebackendguy.rentflow.data.isValidMobile
+import com.thebackendguy.rentflow.data.mobileDigits
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.ui.components.AuthShell
 import com.thebackendguy.rentflow.ui.components.InfoCard
@@ -46,8 +48,10 @@ import kotlinx.coroutines.launch
 
 /**
  * One sign-in screen for both roles (the web's MobileLoginForm): email with a
- * password, or a one-time code emailed by the API. [notice] explains why the
- * user was sent here, such as an expired session.
+ * password, or a one-time code emailed by the API. A tenant may use their mobile
+ * number instead of the email with a password (the API accepts either), since
+ * not every tenant has an email. [notice] explains why the user was sent here,
+ * such as an expired session.
  */
 @Composable
 fun LoginScreen(
@@ -71,13 +75,24 @@ fun LoginScreen(
     var sending by remember { mutableStateOf(false) }
     var serverError by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val emailErr = if (submitted) emailError(email) else null
+    // Tenants signing in with a password may type a mobile number; codes go by email only
+    val mobileAllowed = role == UserRole.Tenant && !usingOtp
+    fun idError(): String? {
+        val looksLikeMobile = !email.contains('@') && email.any(Char::isDigit)
+        return when {
+            mobileAllowed && email.isBlank() -> "Enter your email or mobile number"
+            mobileAllowed && looksLikeMobile -> if (isValidMobile(mobileDigits(email))) null else "Enter a valid 10-digit mobile number"
+            role == UserRole.Tenant && usingOtp && looksLikeMobile -> "Use your email for a one-time code"
+            else -> emailError(email)
+        }
+    }
+    val emailErr = if (submitted) idError() else null
     val passwordErr = if (submitted && !usingOtp && password.isEmpty()) "Password is required" else null
     val codeErr = if (submitted && usingOtp) (if (!otpSent) "Tap Send code first" else codeError(code)) else null
 
     fun submit() {
         submitted = true
-        val ok = emailError(email) == null && if (usingOtp) otpSent && codeError(code) == null else password.isNotEmpty()
+        val ok = idError() == null && if (usingOtp) otpSent && codeError(code) == null else password.isNotEmpty()
         if (!ok || busy) return
         busy = true
         serverError = null
@@ -93,7 +108,7 @@ fun LoginScreen(
     }
 
     fun sendCode() {
-        if (emailError(email) != null) {
+        if (idError() != null) {
             submitted = true
             return
         }
@@ -129,7 +144,7 @@ fun LoginScreen(
             text = when {
                 usingOtp -> "We’ll email you a one-time code to sign in."
                 role == UserRole.Landlord -> "Manage your properties and track rent collections."
-                else -> "Pay your rent, download receipts, & review your lease."
+                else -> "See your bills, what’s due and what you’ve paid."
             },
             style = RfType.BodyMd,
             color = Rf.OnSurfaceVariant,
@@ -143,11 +158,11 @@ fun LoginScreen(
 
         Column(Modifier.padding(top = 24.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             RfTextField(
-                label = "Email Address",
+                label = if (mobileAllowed) "Email or mobile number" else "Email Address",
                 value = email,
                 onValueChange = { email = it.trim() },
-                icon = Lucide.Mail,
-                placeholder = "name@company.com",
+                icon = if (mobileAllowed) Lucide.User else Lucide.Mail,
+                placeholder = if (mobileAllowed) "name@company.com or 98765 43210" else "name@company.com",
                 keyboardType = KeyboardType.Email,
                 error = emailErr
             )
@@ -242,7 +257,7 @@ fun LoginScreen(
             }
         } else {
             Text(
-                text = "Invited by your landlord? Sign in with the email they added you with.",
+                text = "Invited by your landlord? Sign in with the mobile number or email they added you with.",
                 style = RfType.BodyMd,
                 color = Rf.OnSurfaceVariant,
                 textAlign = TextAlign.Center,

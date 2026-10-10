@@ -78,3 +78,16 @@ fun mobileLabel(mobile: String?): String? =
 fun mobileDigits(mobile: String?): String = mobile?.filter(Char::isDigit)?.takeLast(10).orEmpty()
 
 fun isValidMobile(digits: String) = digits.length == 10 && digits.first() in '6'..'9'
+
+/** Who is signed in; each has its own API prefix and screens. */
+enum class UserRole { Landlord, Tenant }
+
+/** Rupees with Indian digit grouping, like the web's inr(): 145000 -> ₹1,45,000. */
+fun inr(amount: Int): String {
+    val digits = kotlin.math.abs(amount).toString()
+    val grouped = if (digits.length <= 3) digits else {
+        val head = digits.dropLast(3)
+        head.reversed().chunked(2).joinToString(",").reversed() + "," + digits.takeLast(3)
+    }
+    return (if (amount < 0) "−₹" else "₹") + grouped
+}
