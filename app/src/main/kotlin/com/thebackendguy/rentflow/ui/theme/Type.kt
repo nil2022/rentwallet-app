@@ -1,22 +1,32 @@
 package com.thebackendguy.rentflow.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.thebackendguy.rentflow.R
 
-// Plus Jakarta Sans variable font; each weight sets the font's wght axis
+// Plus Jakarta Sans variable font (wght 200-800). Each weight must set the wght axis
+// itself: without it every weight draws at the file's default 400.
+@OptIn(ExperimentalTextApi::class)
+private fun jakartaFont(weight: FontWeight) = Font(
+    R.font.plus_jakarta_sans,
+    weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight))
+)
+
 val PlusJakartaSans = FontFamily(
-    Font(R.font.plus_jakarta_sans, FontWeight.Normal),
-    Font(R.font.plus_jakarta_sans, FontWeight.Medium),
-    Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
-    Font(R.font.plus_jakarta_sans, FontWeight.Bold),
-    Font(R.font.plus_jakarta_sans, FontWeight.ExtraBold)
+    jakartaFont(FontWeight.Normal),
+    jakartaFont(FontWeight.Medium),
+    jakartaFont(FontWeight.SemiBold),
+    jakartaFont(FontWeight.Bold),
+    jakartaFont(FontWeight.ExtraBold)
 )
 
 private fun style(size: Int, lineHeight: Int, weight: FontWeight, tracking: Double = 0.0) = TextStyle(

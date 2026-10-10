@@ -444,6 +444,7 @@ private fun RentFlowApp() {
                         Screen.Tenants -> TenantsScreen(
                             shell = shell,
                             onOpenTenant = { go(Screen.TenantDetails, it) },
+                            onEditTenant = { go(Screen.TenantForm, it) },
                             onAddTenant = { go(Screen.AddTenant) },
                             onAssignRoom = { go(Screen.AddTenant, it) }
                         )

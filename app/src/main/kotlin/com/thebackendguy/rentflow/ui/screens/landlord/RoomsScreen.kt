@@ -276,7 +276,7 @@ internal fun Caps(text: String) {
 /* ------------------------------ Search and filters ------------------------------ */
 
 @Composable
-private fun FilterButton(on: Int, onClick: () -> Unit) {
+internal fun FilterButton(on: Int, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Box {
         Box(
@@ -307,7 +307,7 @@ private fun AppliedFilters(status: RoomStatus, floor: Int?, onClearStatus: () ->
 }
 
 @Composable
-private fun AppliedChip(label: String, onRemove: () -> Unit) {
+internal fun AppliedChip(label: String, onRemove: () -> Unit) {
     Pill(
         label, background = Rf.PrimaryFixed, content = Rf.Primary, trailingIcon = Lucide.X,
         style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), horizontal = 10.dp, vertical = 5.dp,

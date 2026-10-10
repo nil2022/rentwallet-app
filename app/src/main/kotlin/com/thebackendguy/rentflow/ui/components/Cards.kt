@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -166,22 +167,42 @@ data class HealthTileSpec(
     // null for the usual card, title and caption colours
     val background: Color? = null,
     val titleColor: Color? = null,
-    val subColor: Color? = null
+    val subColor: Color? = null,
+    // true while the figures load: the badge, title and caption pulse instead
+    val loading: Boolean = false
 )
 
 @Composable
 fun HealthTile(spec: HealthTileSpec, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(12.dp)
     Column(modifier.softShadow(shape).clip(shape).background(spec.background ?: Rf.Lowest).padding(14.dp)) {
+        // On a tinted tile the placeholder bars take the tile's own shade
+        val bone = Rf.Container
+        val boneSoft = if (spec.background != null) Rf.Container else Rf.Low
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconTile(spec.icon, background = spec.tileBg, tint = spec.iconColor)
-            Text(text = spec.badge, style = RfType.LabelSm, color = spec.badgeColor)
+            FadeIn(!spec.loading, placeholder = { Skeleton(Modifier.width(36.dp).height(10.dp), radius = 5.dp, color = boneSoft) }) {
+                Text(text = spec.badge, style = RfType.LabelSm, color = spec.badgeColor)
+            }
         }
-        Text(text = spec.title, style = RfType.HeadlineSm, color = spec.titleColor ?: Rf.OnSurface, modifier = Modifier.padding(top = 12.dp), maxLines = 1)
-        Text(
-            text = spec.sub, style = RfType.LabelSm, color = spec.subColor ?: Rf.OnSurfaceVariant, maxLines = 1,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)
-        )
+        FadeIn(
+            !spec.loading,
+            Modifier.padding(top = 12.dp),
+            placeholder = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Skeleton(Modifier.fillMaxWidth(0.75f).height(20.dp), color = bone)
+                    Skeleton(Modifier.fillMaxWidth(0.5f).height(10.dp), radius = 5.dp, color = boneSoft)
+                }
+            }
+        ) {
+            Column {
+                Text(text = spec.title, style = RfType.HeadlineSm, color = spec.titleColor ?: Rf.OnSurface, maxLines = 1)
+                Text(
+                    text = spec.sub, style = RfType.LabelSm, color = spec.subColor ?: Rf.OnSurfaceVariant, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
     }
 }
 
@@ -294,7 +315,8 @@ fun DetailRows(rows: List<Detail>) {
     }
 }
 
-data class IconDetail(val icon: LucideIcon, val label: String, val value: String)
+/** One row of [IconRows]; a null [value] is still loading and pulses. */
+data class IconDetail(val icon: LucideIcon, val label: String, val value: String?)
 
 /** Settings-style rows: icon tile, small label, bold value. */
 @Composable
@@ -310,7 +332,12 @@ fun IconRows(rows: List<IconDetail>) {
                 IconTile(row.icon, background = Rf.Low, tint = Rf.Primary)
                 Column(Modifier.weight(1f)) {
                     Text(text = row.label, style = RfType.LabelSm, color = Rf.Outline)
-                    Text(text = row.value, style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    FadeIn(row.value != null, placeholder = { Skeleton(Modifier.padding(top = 4.dp).width(36.dp).height(14.dp)) }) {
+                        Text(
+                            text = row.value.orEmpty(), style = RfType.BodyMd.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurface,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

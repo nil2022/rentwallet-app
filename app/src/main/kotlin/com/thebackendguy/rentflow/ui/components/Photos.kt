@@ -223,7 +223,7 @@ private fun RetryChip(onRetry: () -> Unit, withLabel: Boolean) {
 /* ------------------------------ Profile photos ------------------------------ */
 
 /**
- * Round profile photo. With no photo it shows the initials. While the photo
+ * Round profile photo ([shape] makes it another shape). With no photo it shows the initials. While the photo
  * downloads it shows the Wave Sweep, then fades the photo in; if it can't be
  * fetched it falls back to the initials, with a retry badge when [retryBadge].
  * Pass [load] to follow the download from outside (the photo picker does).
@@ -237,16 +237,19 @@ fun PersonAvatar(
     content: Color = Rf.Primary,
     online: Boolean = false,
     retryBadge: Boolean = size >= 56.dp,
-    load: PhotoLoad = rememberPhotoLoad(photoUrl)
+    load: PhotoLoad = rememberPhotoLoad(photoUrl),
+    shape: Shape = CircleShape
 ) {
     val initials = name.trim().split(Regex("\\s+")).filter(String::isNotEmpty).take(2)
         .joinToString("") { it.first().uppercase() }.ifEmpty { "?" }
     val hasPhoto = !photoUrl.isNullOrBlank()
     val alpha = photoAlpha(load)
     Box(Modifier.size(size)) {
-        Box(Modifier.fillMaxSize().clip(CircleShape)) {
+        Box(Modifier.fillMaxSize().clip(shape)) {
             if (alpha < 1f) {
                 if (!hasPhoto || load.failed) {
+                    // The fill reaches the corners when the shape isn't round
+                    Box(Modifier.fillMaxSize().background(background))
                     Avatar(initials, background = background, content = content, size = size,
                         style = if (size >= 56.dp) RfType.HeadlineMd else RfType.LabelMd.copy(fontWeight = FontWeight.Bold))
                 } else {

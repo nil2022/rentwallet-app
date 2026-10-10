@@ -50,6 +50,37 @@ fun methodLabel(method: String?): String = when (method) {
 /** A stored file link that points to a PDF (its key keeps the file's extension). */
 fun isPdfLink(url: String?): Boolean = url != null && Regex("\\.pdf($|[?#])", RegexOption.IGNORE_CASE).containsMatchIn(url)
 
+/* ------------------------------ Rent status ------------------------------ */
+
+/** The web's rent status filter, most urgent first; [key] is the web's status value. */
+enum class RentKind(val key: String, val label: String) {
+    Overdue("overdue", "Overdue"),
+    Due("pending", "Due"),
+    Paid("paid", "Paid"),
+    Unbilled("unbilled", "Not billed")
+}
+
+/**
+ * Where a tenant stands on rent: [amount] is what is overdue or due (or what was paid),
+ * [advance] the money they paid beyond their bills that no bill has used yet.
+ */
+data class RentStatus(val kind: RentKind, val amount: Double = 0.0, val advance: Double = 0.0)
+
+/**
+ * The web's paymentState: an unpaid bill from an earlier month makes the tenant
+ * overdue, then this month's bill is due or paid; with no bill this month, not billed.
+ */
+fun rentStatus(current: BillDto?, overdue: List<BillDto>, advance: Double): RentStatus {
+    val held = round2(advance)
+    val overdueAmount = overdue.sumOf { it.pendingAmount }
+    return when {
+        overdueAmount > 0 -> RentStatus(RentKind.Overdue, overdueAmount, held)
+        current != null && current.pendingAmount > 0 -> RentStatus(RentKind.Due, current.pendingAmount, held)
+        current != null -> RentStatus(RentKind.Paid, current.paidAmount, held)
+        else -> RentStatus(RentKind.Unbilled, advance = held)
+    }
+}
+
 /* ------------------------------ Bills ------------------------------ */
 
 /**
@@ -96,6 +127,35 @@ object PaymentStore {
             }
         }
         ApiResult.Ok(CollectionBills(monthBills.data.orEmpty(), monthBills.summary, unpaid))
+    }
+
+    /**
+     * Every billed tenant's [RentStatus], by tenant id, from the web's four calls: this
+     * month's bills, the pending and the partly paid ones (earlier months are overdue),
+     * and the bills holding advance. A tenant in a room who isn't here is not billed.
+     */
+    suspend fun rentStatuses(): ApiResult<Map<String, RentStatus>> = coroutineScope {
+        val month = YearMonth.now().apiMonth()
+        val calls = listOf(
+            async { apiCall { api.bills(monthYear = month, limit = PAGE_SIZE) } },
+            async { apiCall { api.bills(status = "pending", limit = PAGE_SIZE) } },
+            async { apiCall { api.bills(status = "partial", limit = PAGE_SIZE) } },
+            async { apiCall { api.bills(hasAdvance = true, limit = PAGE_SIZE) } }
+        )
+        val lists = calls.mapIndexed { i, call ->
+            when (val r = call.await()) {
+                is ApiResult.Ok -> r.value.data.orEmpty()
+                // The advance call is extra: without it the statuses still show
+                is ApiResult.Fail -> if (i == 3) emptyList() else return@coroutineScope r
+            }
+        }
+        val current = lists[0].associateBy { it.tenantId }
+        val overdue = (lists[1] + lists[2]).filter { it.monthYear < month }.groupBy { it.tenantId }
+        val held = lists[3].groupBy { it.tenantId }
+        val ids = current.keys + overdue.keys + held.keys
+        ApiResult.Ok(ids.associateWith { id ->
+            rentStatus(current[id], overdue[id].orEmpty(), held[id].orEmpty().sumOf { it.advanceLeft })
+        })
     }
 
     /** One tenant's bills, one room's bills, or one month's bills (newest month first). */

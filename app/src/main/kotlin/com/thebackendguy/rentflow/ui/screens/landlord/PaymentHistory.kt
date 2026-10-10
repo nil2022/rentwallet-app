@@ -40,7 +40,9 @@ import com.thebackendguy.rentflow.data.monthLabel
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.BillDto
 import com.thebackendguy.rentflow.ui.components.CsvShare
+import com.thebackendguy.rentflow.ui.components.FadeIn
 import com.thebackendguy.rentflow.ui.components.RfCard
+import com.thebackendguy.rentflow.ui.components.Skeleton
 import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
@@ -100,60 +102,65 @@ internal fun PaymentHistoryCard(
         }
 
         val list = bills
-        when {
-            list == null && error != null -> Text(error.orEmpty(), style = RfType.BodySm, color = Rf.Error)
-            list == null -> Text("Loading bills…", style = RfType.BodySm, color = Rf.OnSurfaceVariant)
-            list.isEmpty() -> {
-                Text(
-                    "Record this month’s rent and any payment received. Every bill you save shows up here.",
-                    style = RfType.BodySm, color = Rf.OnSurfaceVariant
-                )
-                WideAction("Record Payment", Lucide.Plus, Rf.Primary, Rf.OnPrimary) { onRecord(null) }
-            }
-            else -> {
-                // Totals of every bill; advance held only once this tenant has had any
-                val hadAdvance = list.any { it.advanceAmount > 0 || it.creditApplied > 0 }
-                val stats = listOfNotNull(
-                    Triple("Billed", list.sumOf { it.totalDue }, Rf.OnSurface),
-                    Triple("Received", list.sumOf { it.paidAmount }, Rf.Secondary),
-                    list.sumOf { it.pendingAmount }.let { Triple("Still due", it, if (it > 0) Rf.Error else Rf.OnSurface) },
-                    if (hadAdvance) Triple("Advance held", list.sumOf { it.advanceLeft }, Rf.Primary) else null
-                )
-                stats.chunked(if (stats.size == 4) 2 else 3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { (label, value, color) -> HistoryStat(label, inr(value), color, Modifier.weight(1f)) }
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("all" to "All", "pending" to "Pending", "partial" to "Partial", "paid" to "Paid").forEach { (key, label) ->
-                        val on = filter == key
+        // Placeholders pulse until the bills (or an error) arrive, then the card fades in
+        FadeIn(list != null || error != null, placeholder = { HistoryPlaceholder() }) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                when {
+                    list == null && error != null -> Text(error.orEmpty(), style = RfType.BodySm, color = Rf.Error)
+                    list == null -> Unit
+                    list.isEmpty() -> {
                         Text(
-                            label, style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = if (on) Rf.Primary else Rf.OnSurfaceVariant,
-                            modifier = Modifier.pressable({ filter = key; shown = PAGE }, pressScale = 0.96f).clip(CircleShape)
-                                .background(if (on) Rf.PrimaryFixed else Rf.Lowest)
-                                .border(if (on) 1.5.dp else 1.dp, if (on) Rf.Primary else Rf.OutlineVariant, CircleShape)
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                            "Record this month’s rent and any payment received. Every bill you save shows up here.",
+                            style = RfType.BodySm, color = Rf.OnSurfaceVariant
                         )
+                        WideAction("Record Payment", Lucide.Plus, Rf.Primary, Rf.OnPrimary) { onRecord(null) }
                     }
-                }
-
-                val rows = list.filter { filter == "all" || it.paymentStatus == filter }
-                if (rows.isEmpty()) {
-                    Text("No $filter bills.", style = RfType.BodySm, color = Rf.OnSurfaceVariant)
-                } else {
-                    Column {
-                        rows.take(shown).forEachIndexed { index, bill ->
-                            if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
-                            HistoryRow(bill, onOpen = { openId = bill.id }, onCollect = { onRecord(bill.monthYear) })
+                    else -> {
+                        // Totals of every bill; advance held only once this tenant has had any
+                        val hadAdvance = list.any { it.advanceAmount > 0 || it.creditApplied > 0 }
+                        val stats = listOfNotNull(
+                            Triple("Billed", list.sumOf { it.totalDue }, Rf.OnSurface),
+                            Triple("Received", list.sumOf { it.paidAmount }, Rf.Secondary),
+                            list.sumOf { it.pendingAmount }.let { Triple("Still due", it, if (it > 0) Rf.Error else Rf.OnSurface) },
+                            if (hadAdvance) Triple("Advance held", list.sumOf { it.advanceLeft }, Rf.Primary) else null
+                        )
+                        stats.chunked(if (stats.size == 4) 2 else 3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { (label, value, color) -> HistoryStat(label, inr(value), color, Modifier.weight(1f)) }
+                            }
                         }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("all" to "All", "pending" to "Pending", "partial" to "Partial", "paid" to "Paid").forEach { (key, label) ->
+                                val on = filter == key
+                                Text(
+                                    label, style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = if (on) Rf.Primary else Rf.OnSurfaceVariant,
+                                    modifier = Modifier.pressable({ filter = key; shown = PAGE }, pressScale = 0.96f).clip(CircleShape)
+                                        .background(if (on) Rf.PrimaryFixed else Rf.Lowest)
+                                        .border(if (on) 1.5.dp else 1.dp, if (on) Rf.Primary else Rf.OutlineVariant, CircleShape)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+
+                        val rows = list.filter { filter == "all" || it.paymentStatus == filter }
+                        if (rows.isEmpty()) {
+                            Text("No $filter bills.", style = RfType.BodySm, color = Rf.OnSurfaceVariant)
+                        } else {
+                            Column {
+                                rows.take(shown).forEachIndexed { index, bill ->
+                                    if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+                                    HistoryRow(bill, onOpen = { openId = bill.id }, onCollect = { onRecord(bill.monthYear) })
+                                }
+                            }
+                        }
+                        if (rows.size > shown) {
+                            WideAction("Show more (${rows.size - shown} more)", Lucide.ChevronDown, Rf.Low, Rf.Primary) { shown += PAGE }
+                        }
+                        WideAction("Record Payment", Lucide.Plus, Rf.Primary, Rf.OnPrimary) { onRecord(null) }
+                        WideAction("Export CSV", Lucide.Download, Rf.Low, Rf.Primary) { shareStatement(context, tenantName, list) }
                     }
                 }
-                if (rows.size > shown) {
-                    WideAction("Show more (${rows.size - shown} more)", Lucide.ChevronDown, Rf.Low, Rf.Primary) { shown += PAGE }
-                }
-                WideAction("Record Payment", Lucide.Plus, Rf.Primary, Rf.OnPrimary) { onRecord(null) }
-                WideAction("Export CSV", Lucide.Download, Rf.Low, Rf.Primary) { shareStatement(context, tenantName, list) }
             }
         }
     }
@@ -173,6 +180,37 @@ internal fun PaymentHistoryCard(
             },
             onDeleted = { openId = null }
         )
+    }
+}
+
+/** Two totals and two bills, pulsing, in the shape of the card's content. */
+@Composable
+private fun HistoryPlaceholder() {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(2) {
+                Column(
+                    Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Skeleton(Modifier.fillMaxWidth(0.5f).height(9.dp), radius = 5.dp)
+                    Skeleton(Modifier.fillMaxWidth(0.7f).height(15.dp))
+                }
+            }
+        }
+        Column {
+            listOf(0.48f, 0.42f).forEachIndexed { index, width ->
+                if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+                Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Skeleton(Modifier.fillMaxWidth(width).height(12.dp))
+                        Skeleton(Modifier.fillMaxWidth(width * 0.7f).height(16.dp))
+                        Skeleton(Modifier.fillMaxWidth(width + 0.2f).height(10.dp), radius = 5.dp, color = Rf.Low)
+                    }
+                    if (index == 0) Skeleton(Modifier.size(width = 70.dp, height = 34.dp), radius = 11.dp)
+                }
+            }
+        }
     }
 }
 

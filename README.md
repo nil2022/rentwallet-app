@@ -9,7 +9,7 @@
   Built with Kotlin and Jetpack Compose, and designed to match the RentFlow web app’s phone layout.
 </p>
 
-> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. The money figures on Overview, Tenants and Profile, the wallet, and the tenant’s rent screens still show **sample numbers** (see [What’s next](#whats-next)).
+> **Status:** sign-in, and the landlord’s properties, rooms, tenants and who lives in which room, run on the **live RentFlow API**, the same one the web app uses. So does the landlord’s **Rent Collection** (the Payments tab), from the bills API. So do the tenants’ payment statuses on the Tenants tab. The money figures on Overview and Profile, the wallet, and the tenant’s rent screens still show **sample numbers** (see [What’s next](#whats-next)).
 
 ## Contents
 
@@ -50,7 +50,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | 09 Overview | 10 Tenants | 11 Tenant Details | 12 Profile |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/09-landlord-overview.png" width="170" alt="Landlord overview"> | <img src="docs/screenshots/10-tenants.png" width="170" alt="Tenants"> | <img src="docs/screenshots/11-tenant-details.png" width="170" alt="Tenant details"> | <img src="docs/screenshots/12-landlord-profile.png" width="170" alt="Landlord profile"> |
-| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | Search and filter tenants. Each card shows their property and room; tenants without a room get an “Assign room” link. | The web’s tenant page (screenshot is the older design, [new mockup](https://claude.ai/artifact/ABML2dsqaiv3pPLiEQ6LpC)): photo, Active, since, mobile and email; the assigned unit and a payment status from the bills (overdue, due, advance, paid or not billed); Record Payment and Edit. Then Room & Tenancy, Roommates, Payment History, Contact & Account (Call, WhatsApp, email, how they sign in) and Tenancy Actions (change room, remove from room, delete). | Real owner details and counts. Edit profile and change password. |
+| As on the web’s phone dashboard: portfolio health (real counts), quick actions, your first three properties with “View all”, the payment ledger and a sub-meter card. | The web’s Tenant Directory (screenshot is the older design, [new mockup](https://claude.ai/artifact/RaTkLr6Mz9Z5k1pTrTXDQa)): search by name, mobile, email or room, and a Filters sheet for property and rent status (Overdue, Due, Paid, Not billed) with counts; filters that are on show as chips with “Clear all”. Each card: photo with a dot (green in a room, amber no room, red overdue), contacts, room and property, monthly rent, this month’s payment status from the bills, room type and date added, then View, Edit and Delete. ⋮ assigns, moves or removes the room, or calls the tenant. Every tenant is in one scroll. | The web’s tenant page (screenshot is the older design, [new mockup](https://claude.ai/artifact/ABML2dsqaiv3pPLiEQ6LpC)): photo, Active, since, mobile and email; the assigned unit and a payment status from the bills (overdue, due, advance, paid or not billed); Record Payment and Edit. Then Room & Tenancy, Roommates, Payment History, Contact & Account (Call, WhatsApp, email, how they sign in) and Tenancy Actions (change room, remove from room, delete). | Real owner details and counts. Edit profile and change password. |
 
 ### Properties and rooms
 
@@ -93,7 +93,7 @@ A wrong password or code floats up from the bottom as a red note. Buttons show a
 | Remove from room | Delete | Loading | Empty | Can’t connect |
 |:---:|:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/sheet-end-lease.png" width="135" alt="Remove from room confirmation"> | <img src="docs/screenshots/sheet-delete-property.png" width="135" alt="Delete property confirmation"> | <img src="docs/screenshots/state-loading.png" width="135" alt="Loading"> | <img src="docs/screenshots/state-empty.png" width="135" alt="Empty list"> | <img src="docs/screenshots/state-error.png" width="135" alt="Error with retry"> |
-| Says what happens before a tenant leaves a room. | Deletes ask first. A property or room with tenants can’t be deleted until they are removed from it. | Placeholder cards while a list loads. | A first-time landlord sees what to add first. | The reason and a “Try again” button. |
+| Says what happens before a tenant leaves a room. | Deletes ask first. A property or room with tenants can’t be deleted until they are removed from it. | Placeholder cards that pulse, as on the web, while a list loads. | A first-time landlord sees what to add first. | The reason and a “Try again” button. |
 
 After every save or delete, a short message such as “Property saved” floats up from the bottom.
 
@@ -189,7 +189,7 @@ How navigation works:
 | Payments: Rent Collection | Everything: the month’s bills and totals, overdue bills, tenants not billed, bill details | None |
 | Record Payment | Everything: new bills, money received, advance, meter photo and payment proof uploads | None |
 | Rent History | Everything: monthly totals from `/landlord/payment/summary`, chart, CSV | None |
-| Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room. The tenant’s Payment History | Paid / Due badges on the list, tenant alerts, Send reminder |
+| Tenants, tenant details | Names, contacts, rooms, rent and deposit. Add, edit, delete, assign or change a room, remove from a room. This month’s payment status on the list and the tenant page, and the tenant’s Payment History | None |
 | Landlord Profile | Name, email, mobile, photo, counts. Edit profile, change password | Collection tiles, wallet, bank account |
 | Tenant Profile | Name, email, mobile | Rent and lease rows |
 | Tenant Home, Pay Rent, Payments, Receipt | None yet | Everything |
@@ -233,7 +233,7 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 
 **Photo crop and preview.** Photos can be taken with the camera or picked from the gallery, and each one opens in a crop screen first: move and pinch the photo under a frame with a 3×3 grid, pick Original, 4:3, 16:9 or 1:1, and rotate it a quarter turn at a time. Several photos are cropped one by one, or added as they are with “Use all as they are”. Profile photos are cropped in a round 1:1 frame. Tapping a photo in a form opens it full screen: swipe between photos, pinch or double-tap to zoom, and Crop (new photos), Make cover or Remove. New photos are copied into the app’s own folder straight away, so they survive Android closing the app while the camera is open.
 
-**Photos on a slow network.** While a property or room photo downloads, its indigo placeholder shows a light band sliding across it; the photo then fades in, and if it can’t be fetched the placeholder offers “Tap to retry”. Profile photos show the Stitch design’s Wave Sweep (a ring of colour, a pulse, a sweep and a camera icon) and fall back to the person’s initials, with a retry button on the larger ones. Lists that load for the first time show pulsing placeholder cards. Photos already downloaded are kept on the phone and show without a network.
+**Photos on a slow network.** While a property or room photo downloads, its indigo placeholder shows a light band sliding across it; the photo then fades in, and if it can’t be fetched the placeholder offers “Tap to retry”. Profile photos show the Stitch design’s Wave Sweep (a ring of colour, a pulse, a sweep and a camera icon) and fall back to the person’s initials, with a retry button on the larger ones. Lists that load for the first time show placeholder cards, and figures that wait for data (Overview’s portfolio tiles, a tenant’s payment status and Payment History, the status pills on the Tenants tab, Profile’s counts) show grey bars of the text’s size instead of “Loading…”. Both pulse like the web’s placeholders (fading to 40% and back every 2 seconds), and the real text fades in when it arrives ([design mockup](https://claude.ai/artifact/7p14L17482HEJbigBuxvXw)). Photos already downloaded are kept on the phone and show without a network.
 
 ## Tech stack
 
@@ -336,7 +336,7 @@ The app uses the same backend as the web app (`rent-management`, Express and Mon
 1. ~~**Sign-in:** login with password or code, forgot password, registration, log out and remembering the session.~~ Done.
 2. ~~**Landlord data:** properties, rooms, tenants and who lives in which room, with add, edit and delete.~~ Done.
 3. **Tenant rent screens:** need backend work first. Payments must be limited to the signed-in user (today `/tenant/payment` returns everyone’s), and tenants need an endpoint for their own lease.
-4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection, Record Payment, bill details, the tenant’s Payment History and Rent History use them; the money on Overview, Tenants and Profile comes next ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
+4. **Landlord collections:** the backend now has bills (`/landlord/payment`, `/landlord/payment/summary`). Rent Collection, Record Payment, bill details, the tenant’s Payment History and Rent History use them; the Tenants tab shows each tenant’s status from them; the money on Overview and Profile comes next ([design mockup](https://claude.ai/artifact/EL1TgnWtUmQXBppw8baabf)).
 5. **Payments gateway and wallet (optional):** today the backend records payments (cash, UPI or cheque) but moves no money, so there is no wallet or withdrawal yet.
 6. **Notifications, next steps:** to open the right screen from a notification, the backend should put its type and the tenant, room or payment id in the push data. Opening the list marks every notification read, even ones on later pages; a mark-read endpoint for the ones shown would be more exact. Firebase deprecated the FCM token for the Firebase installation ID in firebase-messaging 25.1; moving to it needs the backend to send with `fid` too.
 7. **Smaller photos (optional):** if the backend also saved a small copy of each photo (about 400 px) or a blur hash, lists would load much faster on 3G and could show a blurred preview first.

@@ -193,15 +193,15 @@ internal fun TenantLedgerCard(tenant: Tenant, onClick: () -> Unit) {
 }
 
 
-/** The four portfolio tiles from real data; dashes while it loads. */
+/** The four portfolio tiles from real data; placeholders pulse while it loads. */
 @Composable
 private fun portfolioTiles(portfolio: Portfolio?): List<HealthTileSpec> {
     if (portfolio == null) {
         return listOf(
-            HealthTileSpec(Lucide.Building2, "", "— Properties", "Loading…", Rf.High, Rf.Primary, Rf.Secondary),
-            HealthTileSpec(Lucide.Users, "", "— Tenants", "Loading…", Rf.MintSoft, Rf.Secondary, Rf.Secondary),
-            HealthTileSpec(Lucide.DoorOpen, "", "— Rooms", "Loading…", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High),
-            HealthTileSpec(Lucide.Users, "", "— With space", "Loading…", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High)
+            HealthTileSpec(Lucide.Building2, "", "", "", Rf.High, Rf.Primary, Rf.Secondary, loading = true),
+            HealthTileSpec(Lucide.Users, "", "", "", Rf.MintSoft, Rf.Secondary, Rf.Secondary, loading = true),
+            HealthTileSpec(Lucide.DoorOpen, "", "", "", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High, loading = true),
+            HealthTileSpec(Lucide.Users, "", "", "", Rf.Container, Rf.Primary, Rf.OnSurfaceVariant, background = Rf.High, loading = true)
         )
     }
     val properties = portfolio.properties

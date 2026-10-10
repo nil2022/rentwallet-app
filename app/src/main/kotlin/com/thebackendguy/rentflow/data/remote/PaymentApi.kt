@@ -27,6 +27,7 @@ interface PaymentApi {
         @Query("propertyId") propertyId: String? = null,
         @Query("tenantId") tenantId: String? = null,
         @Query("roomId") roomId: String? = null,
+        @Query("hasAdvance") hasAdvance: Boolean? = null,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): ApiEnvelope<List<BillDto>>

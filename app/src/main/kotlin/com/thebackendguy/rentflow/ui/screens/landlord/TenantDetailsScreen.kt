@@ -54,9 +54,11 @@ import com.thebackendguy.rentflow.data.roomCapacity
 import com.thebackendguy.rentflow.data.shortLabel
 import com.thebackendguy.rentflow.ui.components.AppPage
 import com.thebackendguy.rentflow.ui.components.ConfirmSheet
+import com.thebackendguy.rentflow.ui.components.FadeIn
 import com.thebackendguy.rentflow.ui.components.PersonAvatar
 import com.thebackendguy.rentflow.ui.components.Pill
 import com.thebackendguy.rentflow.ui.components.RfCard
+import com.thebackendguy.rentflow.ui.components.Skeleton
 import com.thebackendguy.rentflow.ui.components.Toasts
 import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.icons.LIcon
@@ -112,6 +114,7 @@ fun TenantDetailsScreen(
             Hero(
                 tenant, roomName, property, room,
                 bills = bills,
+                billsFailed = billsError != null,
                 onRecordPayment = {
                     // A bill is made against the tenant's room, so a tenant without one can't be billed
                     if (roomId == null) Toasts.error("Assign $firstName to a room first. Bills are made against the room.")
@@ -175,17 +178,21 @@ fun TenantDetailsScreen(
 /* ------------------------------ Hero ------------------------------ */
 
 /** How the second hero tile looks: icon, colours, the figure and the line under it. */
-private data class PaymentTile(val icon: LucideIcon, val tint: Color, val tile: Color, val value: String, val sub: String, val alert: Boolean = false)
+private data class PaymentTile(
+    val icon: LucideIcon, val tint: Color, val tile: Color, val value: String, val sub: String,
+    val alert: Boolean = false, val loading: Boolean = false
+)
 
 /**
  * This month's rent, or what is overdue from earlier months, as the web works it out
  * from the bills: overdue wins over due, due over advance, then paid, then not billed.
  */
 @Composable
-private fun paymentTile(bills: List<BillDto>?): PaymentTile {
+private fun paymentTile(bills: List<BillDto>?, failed: Boolean): PaymentTile {
     val now = YearMonth.now()
     val month = now.label()
-    if (bills == null) return PaymentTile(Lucide.Wallet, Rf.Primary, Rf.PrimaryFixed, "—", "Loading bills…")
+    if (bills == null && failed) return PaymentTile(Lucide.Wallet, Rf.Primary, Rf.PrimaryFixed, "—", "Couldn’t load the bills")
+    if (bills == null) return PaymentTile(Lucide.Wallet, Rf.Primary, Rf.PrimaryFixed, "", "", loading = true)
     val current = bills.find { it.monthYear == now.apiMonth() }
     val overdue = bills.filter { it.monthYear < now.apiMonth() && it.pendingAmount > 0 }
     val advance = bills.sumOf { it.advanceLeft }
@@ -215,6 +222,7 @@ private fun Hero(
     property: PropertyDto?,
     room: RoomDto?,
     bills: List<BillDto>?,
+    billsFailed: Boolean,
     onRecordPayment: () -> Unit,
     onEdit: () -> Unit
 ) {
@@ -241,8 +249,8 @@ private fun Hero(
                 Lucide.DoorOpen, Rf.Primary, Rf.PrimaryFixed, "Assigned unit", "Room ${roomName.orEmpty()}",
                 listOfNotNull(property?.propertyName, (tenant.room?.floor ?: room?.floor)?.let(::floorLabel)).joinToString(" • ")
             )
-            val pay = paymentTile(bills)
-            UnitTile(pay.icon, pay.tint, pay.tile, "Payment status", pay.value, pay.sub, valueColor = if (pay.alert) Rf.Error else null)
+            val pay = paymentTile(bills, billsFailed)
+            UnitTile(pay.icon, pay.tint, pay.tile, "Payment status", pay.value, pay.sub, valueColor = if (pay.alert) Rf.Error else null, loading = pay.loading)
         } else {
             UnitTile(Lucide.DoorOpen, Rf.Primary, Rf.PrimaryFixed, "Assigned unit", "Not assigned", "No room yet", empty = true)
         }
@@ -291,7 +299,8 @@ private fun UnitTile(
     value: String,
     sub: String,
     empty: Boolean = false,
-    valueColor: Color? = null
+    valueColor: Color? = null,
+    loading: Boolean = false
 ) {
     val shape = RoundedCornerShape(14.dp)
     Row(
@@ -304,8 +313,20 @@ private fun UnitTile(
         }
         Column(Modifier.weight(1f)) {
             Caps(label)
-            Text(value, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = valueColor ?: Rf.OnSurface)
-            if (sub.isNotEmpty()) Text(sub, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+            FadeIn(
+                !loading,
+                placeholder = {
+                    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Skeleton(Modifier.fillMaxWidth(0.58f).height(15.dp))
+                        Skeleton(Modifier.fillMaxWidth(0.44f).height(10.dp), radius = 5.dp)
+                    }
+                }
+            ) {
+                Column {
+                    Text(value, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = valueColor ?: Rf.OnSurface)
+                    if (sub.isNotEmpty()) Text(sub, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+                }
+            }
         }
     }
 }

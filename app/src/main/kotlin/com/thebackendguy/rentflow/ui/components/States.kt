@@ -1,5 +1,12 @@
 package com.thebackendguy.rentflow.ui.components
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +23,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,20 +41,43 @@ import com.thebackendguy.rentflow.ui.theme.RfType
 
 /* ------------------------------ Loading ------------------------------ */
 
-/**
- * Block where content will appear: it pulses and a light band sweeps across
- * it, like the loading cards in the Stitch design.
- */
+/** The web's skeleton pulse (MUI's): fades to 40% and back every 2 seconds. */
+@Composable
+internal fun skeletonAlpha(): Float {
+    val alpha by rememberInfiniteTransition(label = "skeleton").animateFloat(
+        initialValue = 1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(keyframes {
+            durationMillis = 2000
+            1f at 0 using EaseInOut
+            0.4f at 1000 using EaseInOut
+        }),
+        label = "skeletonAlpha"
+    )
+    return alpha
+}
+
+/** Block where content will appear, pulsing like the web's placeholders. */
 @Composable
 fun Skeleton(modifier: Modifier = Modifier, radius: Dp = 8.dp, color: Color = Rf.Container) {
-    val alpha = pulseAlpha()
+    val alpha = skeletonAlpha()
     Box(
         modifier
             .graphicsLayer { this.alpha = alpha }
             .clip(RoundedCornerShape(radius))
             .background(color)
-            .loadingSweep()
     )
+}
+
+/**
+ * [placeholder] until [loaded], then the content fades in over 0.35 s, as the web
+ * brings in a photo or text once it arrives.
+ */
+@Composable
+fun FadeIn(loaded: Boolean, modifier: Modifier = Modifier, placeholder: @Composable () -> Unit, content: @Composable () -> Unit) {
+    Crossfade(targetState = loaded, modifier = modifier, animationSpec = tween(350), label = "fadeIn") { ready ->
+        if (ready) content() else placeholder()
+    }
 }
 
 /**
@@ -56,7 +87,7 @@ fun Skeleton(modifier: Modifier = Modifier, radius: Dp = 8.dp, color: Color = Rf
  */
 @Composable
 fun LoadingCards(count: Int = 3, imageHeight: Dp = 0.dp) {
-    val hourglass = pulseAlpha()
+    val hourglass = skeletonAlpha()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         repeat(count) {
             RfCard(padding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {

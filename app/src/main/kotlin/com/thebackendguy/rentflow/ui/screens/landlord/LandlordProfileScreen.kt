@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +39,7 @@ import com.thebackendguy.rentflow.data.mobileDigits
 import com.thebackendguy.rentflow.data.session.SessionUser
 import com.thebackendguy.rentflow.ui.components.AppPage
 import com.thebackendguy.rentflow.ui.components.Caption
+import com.thebackendguy.rentflow.ui.components.FadeIn
 import com.thebackendguy.rentflow.ui.components.FormBar
 import com.thebackendguy.rentflow.ui.components.FormSection
 import com.thebackendguy.rentflow.ui.components.HealthTileSpec
@@ -50,6 +53,7 @@ import com.thebackendguy.rentflow.ui.components.Pill
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTextField
 import com.thebackendguy.rentflow.ui.components.SectionHead
+import com.thebackendguy.rentflow.ui.components.Skeleton
 import com.thebackendguy.rentflow.ui.components.TitledCard
 import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.icons.LIcon
@@ -70,7 +74,10 @@ fun LandlordProfileScreen(
     onChangePassword: () -> Unit,
     onLogout: () -> Unit
 ) {
-    val portfolio = portfolioState().data
+    val loaded = portfolioState()
+    val portfolio = loaded.data
+    // Counts pulse while the portfolio loads; a dash if it couldn't load
+    val loadingCounts = portfolio == null && loaded.error == null
     LaunchedEffect(Unit) { LandlordStore.refresh() }
     // Collection numbers stay sample data until the payments API exists
     val demo = Demo.tenants
@@ -85,10 +92,15 @@ fun LandlordProfileScreen(
                 PersonAvatar(user?.name.orEmpty(), user?.photo, size = 64.dp)
                 Column(Modifier.weight(1f)) {
                     Text(user?.name.orEmpty(), style = RfType.HeadlineSm, color = Rf.OnSurface)
-                    Text(
-                        if (propertyCount != null) "Landlord • $propertyCount ${if (propertyCount == 1) "property" else "properties"}" else "Landlord",
-                        style = RfType.LabelSm, color = Rf.OnSurfaceVariant
-                    )
+                    FadeIn(
+                        !loadingCounts,
+                        placeholder = { Skeleton(Modifier.padding(top = 4.dp).width(110.dp).height(10.dp), radius = 5.dp) }
+                    ) {
+                        Text(
+                            if (propertyCount != null) "Landlord • $propertyCount ${if (propertyCount == 1) "property" else "properties"}" else "Landlord",
+                            style = RfType.LabelSm, color = Rf.OnSurfaceVariant
+                        )
+                    }
                 }
                 LIcon(Lucide.ChevronRight, tint = Rf.Outline)
             }
@@ -106,8 +118,8 @@ fun LandlordProfileScreen(
                     listOf(
                         IconDetail(Lucide.Smartphone, "Mobile", user?.mobileLabel ?: "Not added"),
                         IconDetail(Lucide.Mail, "Email", user?.email.orEmpty()),
-                        IconDetail(Lucide.Users, "Total tenants", portfolio?.tenants?.size?.toString() ?: "…"),
-                        IconDetail(Lucide.Building2, "Properties", propertyCount?.toString() ?: "…")
+                        IconDetail(Lucide.Users, "Total tenants", portfolio?.tenants?.size?.toString() ?: if (loadingCounts) null else "—"),
+                        IconDetail(Lucide.Building2, "Properties", propertyCount?.toString() ?: if (loadingCounts) null else "—")
                     )
                 )
             }
