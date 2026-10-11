@@ -91,6 +91,21 @@ fun rentStatus(current: BillDto?, overdue: List<BillDto>, advance: Double): Rent
 
 /* ------------------------------ Bills ------------------------------ */
 
+/** The covered part of bills: [collected] money (received plus advance used) and [adjusted] expenses taken off. */
+data class SettledSplit(val collected: Double, val adjusted: Double) {
+    operator fun plus(other: SettledSplit) = SettledSplit(collected + other.collected, adjusted + other.adjusted)
+}
+
+/** The web's splitSettled: expenses never count for more than what is covered. */
+fun splitSettled(settled: Double, adjusted: Double): SettledSplit {
+    val covered = maxOf(settled, 0.0)
+    val expenses = minOf(maxOf(adjusted, 0.0), covered)
+    return SettledSplit(round2(covered - expenses), round2(expenses))
+}
+
+/** A bill's own split; its covered part is what isn't still due. */
+val BillDto.settledSplit: SettledSplit get() = splitSettled(totalDue - pendingAmount, adjustedAmount)
+
 /**
  * What Rent Collection shows: the chosen month's bills with the API's totals, and
  * every bill still unpaid (pending or partial), from which the earlier months' are overdue.
@@ -103,8 +118,9 @@ data class CollectionBills(val bills: List<BillDto>, val totals: BillTotalsDto?,
 /**
  * What Overview shows about rent this month (the web's useRentOverview): this month's
  * [bills], the [overdueBills] still unpaid from earlier months (oldest first), and the
- * money: [billed], [collected] (money received plus advance used, so never more than
- * billed) and the [advance] held across all months.
+ * money: [billed], [collected] (money received plus advance used), [adjusted] (expenses
+ * the tenants paid and took off; with collected never more than billed) and the
+ * [advance] held across all months.
  */
 data class RentOverview(
     val month: YearMonth,
@@ -112,9 +128,11 @@ data class RentOverview(
     val overdueBills: List<BillDto>,
     val billed: Double,
     val collected: Double,
+    val adjusted: Double,
     val advance: Double
 ) {
-    val percent: Int = if (billed > 0) Math.round(collected / billed * 100).toInt() else 0
+    /** Settled: collected plus expenses taken off. */
+    val percent: Int = if (billed > 0) Math.round((collected + adjusted) / billed * 100).toInt() else 0
     val overdueAmount: Double = overdueBills.sumOf { it.pendingAmount }
     val overdueTenants: Int = overdueBills.map { it.tenantId }.distinct().size
     val overdueSince: String? = overdueBills.firstOrNull()?.monthYear
@@ -223,6 +241,10 @@ object PaymentStore {
         val advance = (advanceCall.await() as? ApiResult.Ok)?.value
         val bills = monthBills.data.orEmpty()
         val summary = monthBills.summary
+        val money = splitSettled(
+            summary?.totalSettled ?: bills.sumOf { it.totalDue - it.pendingAmount },
+            summary?.totalAdjusted ?: bills.sumOf { it.adjustedAmount }
+        )
         ApiResult.Ok(
             RentOverview(
                 month = now,
@@ -230,7 +252,8 @@ object PaymentStore {
                 overdueBills = unpaid.filter { it.monthYear < month }
                     .sortedWith(compareBy<BillDto> { it.monthYear }.thenByDescending { it.pendingAmount }),
                 billed = summary?.totalDue ?: bills.sumOf { it.totalDue },
-                collected = summary?.totalSettled ?: bills.sumOf { it.totalDue - it.pendingAmount },
+                collected = money.collected,
+                adjusted = money.adjusted,
                 advance = advance?.summary?.totalAdvanceHeld ?: advance?.data.orEmpty().sumOf { it.advanceLeft }
             )
         )

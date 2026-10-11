@@ -7,6 +7,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -47,10 +49,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.thebackendguy.rentflow.data.PaymentStore
+import com.thebackendguy.rentflow.data.SettledSplit
 import com.thebackendguy.rentflow.data.apiMonth
 import com.thebackendguy.rentflow.data.inr
 import com.thebackendguy.rentflow.data.monthLabel
 import com.thebackendguy.rentflow.data.parseApiMonth
+import com.thebackendguy.rentflow.data.splitSettled
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.BillSummaryDto
 import com.thebackendguy.rentflow.data.remote.MonthTotalsDto
@@ -96,7 +100,11 @@ private fun HistoryRange.span(now: YearMonth = YearMonth.now()): Span = when (th
     }
 }
 
-private fun collectedPercent(m: MonthTotalsDto): Int = if (m.totalDue > 0) (m.totalSettled / m.totalDue * 100).roundToInt() else 0
+/** What share of the bills is settled: money collected plus expenses taken off. */
+private fun settledPercent(m: MonthTotalsDto): Int = if (m.totalDue > 0) (m.totalSettled / m.totalDue * 100).roundToInt() else 0
+
+/** The web's moneyOf: the settled part as money collected and expenses taken off. */
+private fun moneyOf(m: MonthTotalsDto): SettledSplit = splitSettled(m.totalSettled, m.totalAdjusted)
 
 @Composable
 fun RentHistoryScreen(shell: Shell, onBack: () -> Unit, onOpenMonth: (month: String, propertyId: String?) -> Unit) {
@@ -202,11 +210,19 @@ private fun Kpis(data: BillSummaryDto) {
     val total = data.total
     val overdue = data.months.filter { it.monthYear < now }.sumOf { it.totalPending }
     val billedMonths = data.months.count { it.bills > 0 }
-    val percent = collectedPercent(total)
+    val percent = settledPercent(total)
+    val money = moneyOf(total)
+    val colors = chartColors()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Kpi("Billed", inr(total.totalDue), Rf.OnSurface, "$billedMonths ${if (billedMonths == 1) "month" else "months"} with bills", null, Modifier.weight(1f))
-            Kpi("Collected", inr(total.totalSettled), Rf.Secondary, "$percent% of billed", percent, Modifier.weight(1f))
+            val expenses = money.adjusted > 0
+            Kpi(
+                "Collected", inr(money.collected), Rf.Secondary,
+                if (expenses) "+ ${inr(money.adjusted)} expenses taken off • $percent% settled" else "$percent% of billed",
+                { PartsBar(colors.parts(total), total.totalDue, 6.dp, Modifier.padding(top = 8.dp)) }, Modifier.weight(1f),
+                subColor = if (expenses) Rf.Amber else null
+            )
         }
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Kpi(
@@ -219,25 +235,36 @@ private fun Kpis(data: BillSummaryDto) {
 }
 
 @Composable
-private fun Kpi(label: String, value: String, color: Color, sub: String, bar: Int?, modifier: Modifier) {
+private fun Kpi(
+    label: String, value: String, color: Color, sub: String, bar: (@Composable () -> Unit)?, modifier: Modifier,
+    subColor: Color? = null
+) {
     RfCard(modifier.fillMaxHeight(), shape = RoundedCornerShape(16.dp), padding = PaddingValues(12.dp)) {
         Caps(label)
         Text(value, style = RfType.HeadlineSm.copy(fontWeight = FontWeight.ExtraBold), color = color, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
-        if (bar != null) {
-            Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(6.dp).clip(CircleShape).background(Rf.Container)) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(bar.coerceIn(0, 100) / 100f).background(chartColors().first))
-            }
-        }
-        Text(sub, style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+        bar?.invoke()
+        // A coloured line under the figure is bold, the plain one muted
+        Text(
+            sub, style = RfType.LabelSm.copy(fontWeight = if (subColor != null) FontWeight.Bold else FontWeight.Medium),
+            color = subColor ?: Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }
 
 /* ------------------------------ Chart ------------------------------ */
 
-/** Collected and still-due colours, checked for colour-blind separation on both surfaces, as on the web. */
+/**
+ * Collected (green, as on the web), expenses taken off (amber, as on the app's bills)
+ * and still due (red, so it stays apart from the amber).
+ */
+private data class ChartColors(val collected: Color, val adjusted: Color, val due: Color) {
+    /** Money and expenses as parts of a month's bar. */
+    fun parts(m: MonthTotalsDto): List<Pair<Double, Color>> = moneyOf(m).let { listOf(it.collected to collected, it.adjusted to adjusted) }
+}
+
 @Composable
-private fun chartColors(): Pair<Color, Color> =
-    if (Rf.Surface.luminance() < 0.5f) Color(0xFF18966D) to Color(0xFFC4842A) else Color(0xFF0E8A5F) to Color(0xFFC98A22)
+private fun chartColors(): ChartColors =
+    ChartColors(if (Rf.Surface.luminance() < 0.5f) Color(0xFF18966D) else Color(0xFF0E8A5F), Rf.Amber, Rf.Error)
 
 /** "₹1.5L", "₹68K", "₹500" for the axis. */
 private fun compactRupees(value: Double): String = when {
@@ -254,12 +281,14 @@ private fun niceStep(max: Double): Double {
 }
 
 /**
- * One stacked bar per month: collected at the bottom, still due on top, together the
- * month's bill total. The first tap on a month shows its figures, a second opens it.
+ * One stacked bar per month: collected at the bottom, then expenses taken off, still due
+ * on top, together the month's bill total. The first tap on a month shows its figures,
+ * a second opens it.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HistoryChart(months: List<MonthTotalsDto>, onOpenMonth: (String) -> Unit) {
-    val (collected, due) = chartColors()
+    val (collected, adjusted, due) = chartColors()
     val measurer = rememberTextMeasurer()
     val axisStyle = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Rf.OnSurfaceVariant)
     val nowStyle = axisStyle.copy(color = Rf.OnSurface, fontWeight = FontWeight.Bold)
@@ -275,8 +304,12 @@ private fun HistoryChart(months: List<MonthTotalsDto>, onOpenMonth: (String) -> 
 
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp), spacing = 10.dp) {
         Text("Billed vs collected, month by month", style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            listOf("Collected" to collected, "Still due" to due).forEach { (label, color) ->
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOfNotNull(
+                "Collected" to collected,
+                ("Expenses taken off" to adjusted).takeIf { months.any { it.totalAdjusted > 0 } },
+                "Still due" to due
+            ).forEach { (label, color) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Box(Modifier.size(10.dp).clip(RoundedCornerShape(3.dp)).background(color))
                     Text(label, style = RfType.LabelSm.copy(fontWeight = FontWeight.SemiBold), color = Rf.OnSurfaceVariant)
@@ -322,8 +355,11 @@ private fun HistoryChart(months: List<MonthTotalsDto>, onOpenMonth: (String) -> 
                 if (active == i) drawRect(highlight, Offset(padLeft + slot * i + 2.dp.toPx(), padTop), Size(slot - 4.dp.toPx(), plotHeight))
                 if (m.totalDue > 0) {
                     val ySettled = y(m.totalSettled)
+                    val yCollected = y(moneyOf(m).collected)
+                    val hasExpenses = moneyOf(m).adjusted > 0
                     val gap = if (m.totalPending > 0 && m.totalSettled > 0) 2.dp.toPx() else 0f
-                    segment(collected, x, barWidth, ySettled, base, roundTop = m.totalPending <= 0, radius = radius)
+                    segment(collected, x, barWidth, yCollected, base, roundTop = m.totalPending <= 0 && !hasExpenses, radius = radius)
+                    if (hasExpenses) segment(adjusted, x, barWidth, ySettled, yCollected, roundTop = m.totalPending <= 0, radius = radius)
                     if (m.totalPending > 0) segment(due, x, barWidth, y(m.totalDue), ySettled - gap, roundTop = true, radius = radius)
                 } else if (m.monthYear <= now) {
                     drawLine(emptyLine, Offset(x, base - 1.dp.toPx()), Offset(x + barWidth, base - 1.dp.toPx()), strokeWidth = 2.dp.toPx())
@@ -351,7 +387,8 @@ private fun HistoryChart(months: List<MonthTotalsDto>, onOpenMonth: (String) -> 
                 if (m.bills > 0) {
                     listOfNotNull(
                         Triple("Billed", m.totalDue, null),
-                        Triple("Collected", m.totalSettled, collected),
+                        Triple("Collected", moneyOf(m).collected, collected),
+                        moneyOf(m).adjusted.takeIf { it > 0 }?.let { Triple("Expenses taken off", it, adjusted) },
                         Triple("Still due", m.totalPending, due),
                         if (m.totalAdvanceHeld > 0) Triple("Advance held", m.totalAdvanceHeld, null) else null
                     ).forEach { (label, value, color) ->
@@ -390,11 +427,13 @@ private fun DrawScope.segment(color: Color, x: Float, width: Float, top: Float, 
 @Composable
 private fun MonthCards(months: List<MonthTotalsDto>, onOpenMonth: (String) -> Unit) {
     val now = YearMonth.now().apiMonth()
+    val colors = chartColors()
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(0.dp)) {
         months.reversed().forEachIndexed { index, m ->
             if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
             val empty = m.bills == 0
-            val percent = collectedPercent(m)
+            val percent = settledPercent(m)
+            val money = moneyOf(m)
             Column(
                 Modifier.fillMaxWidth().pressable(if (empty) null else ({ onOpenMonth(m.monthYear) }), pressScale = 0.99f)
                     .padding(horizontal = 14.dp, vertical = 12.dp),
@@ -407,18 +446,19 @@ private fun MonthCards(months: List<MonthTotalsDto>, onOpenMonth: (String) -> Un
                     } else {
                         MonthTag(m, now)
                         Box(Modifier.weight(1f))
-                        Text(inr(m.totalSettled), style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
+                        Text(inr(money.collected), style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.OnSurface)
                         Text("of ${inr(m.totalDue)}", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
                         LIcon(Lucide.ChevronRight, size = 16.dp, tint = Rf.Outline)
                     }
                 }
                 if (!empty) {
-                    Box(Modifier.fillMaxWidth().height(5.dp).clip(CircleShape).background(Rf.Container)) {
-                        Box(Modifier.fillMaxHeight().fillMaxWidth(percent.coerceIn(0, 100) / 100f).background(chartColors().first))
+                    if (money.adjusted > 0) {
+                        Text("+ ${inr(money.adjusted)} expenses taken off", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Amber)
                     }
+                    PartsBar(colors.parts(m), m.totalDue, 5.dp)
                     Row {
                         Text(
-                            "${m.bills} ${if (m.bills == 1) "bill" else "bills"} • $percent% collected",
+                            "${m.bills} ${if (m.bills == 1) "bill" else "bills"} • $percent% ${if (money.adjusted > 0) "settled" else "collected"}",
                             style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f)
                         )
                         Text(
@@ -458,9 +498,13 @@ private fun MonthTag(m: MonthTotalsDto, now: String) {
 
 /** One row per month, the way the list shows it, through Android's share menu. */
 private fun shareHistory(context: android.content.Context, months: List<MonthTotalsDto>, label: String) {
-    val header = listOf("Month", "Bills", "Billed", "Collected", "Still due", "Collected %", "Advance held")
+    val header = listOf("Month", "Bills", "Billed", "Collected", "Expenses taken off", "Still due", "Settled %", "Advance held")
     val rows = months.map { m ->
-        listOf(monthLabel(m.monthYear), m.bills, m.totalDue, m.totalSettled, m.totalPending, if (m.bills > 0) collectedPercent(m) else "", m.totalAdvanceHeld)
+        val money = moneyOf(m)
+        listOf(
+            monthLabel(m.monthYear), m.bills, m.totalDue, money.collected, money.adjusted, m.totalPending,
+            if (m.bills > 0) settledPercent(m) else "", m.totalAdvanceHeld
+        )
     }
     CsvShare.share(context, "rent-history-${label.trim().replace(Regex("\\s+"), "-").lowercase()}.csv", header, rows)
 }

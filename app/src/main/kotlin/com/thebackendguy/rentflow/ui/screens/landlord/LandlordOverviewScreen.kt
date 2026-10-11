@@ -214,11 +214,15 @@ private fun healthTiles(portfolio: Portfolio?, overview: RentOverview?, error: S
         else -> HealthTileSpec(Lucide.TriangleAlert, "", "", "", Rf.High, Rf.Primary, Rf.Outline, loading = true)
     }
 
-    // Collected this month of what was billed
+    // Money collected this month of what was billed; with the expenses taken off, the percent is settled
     tiles += when {
         overview != null -> HealthTileSpec(
             Lucide.Wallet, "${overview.percent}%", inr(overview.collected),
-            "of ${inr(overview.billed)} billed" + if (overview.advance > 0) " • ${inr(overview.advance)} advance" else "",
+            listOfNotNull(
+                "of ${inr(overview.billed)} billed",
+                overview.adjusted.takeIf { it > 0 }?.let { "+ ${inr(it)} expenses" },
+                overview.advance.takeIf { it > 0 }?.let { "${inr(it)} advance" }
+            ).joinToString(" • "),
             Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High, subColor = Rf.Primary
         )
         error != null -> HealthTileSpec(Lucide.Wallet, "", "—", "Couldn’t load the bills", Rf.Container, Rf.Primary, Rf.Primary, background = Rf.High)

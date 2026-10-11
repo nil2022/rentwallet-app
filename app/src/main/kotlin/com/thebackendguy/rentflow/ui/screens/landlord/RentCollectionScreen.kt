@@ -54,6 +54,9 @@ import com.thebackendguy.rentflow.data.CollectionBills
 import com.thebackendguy.rentflow.data.Loadable
 import com.thebackendguy.rentflow.data.PaymentStore
 import com.thebackendguy.rentflow.data.Photo
+import com.thebackendguy.rentflow.data.SettledSplit
+import com.thebackendguy.rentflow.data.settledSplit
+import com.thebackendguy.rentflow.data.splitSettled
 import com.thebackendguy.rentflow.data.apiDate
 import com.thebackendguy.rentflow.data.categoryLabel
 import com.thebackendguy.rentflow.data.apiMonth
@@ -218,13 +221,13 @@ fun RentCollectionScreen(
                 val properties = portfolioState.data?.properties.orEmpty()
                 val bills = if (overdueView) data.overdue else data.bills
                 val totals = data.totals
-                // "Collected" is the part of the bills that is covered: money received plus advance used
+                // The covered part of the bills, split into money (received plus advance used) and expenses taken off
                 val summary = if (!overdueView && totals != null) {
-                    Totals(totals.totalDue, totals.totalSettled, totals.totalPending, totals.totalAdvanceHeld)
+                    Totals(totals.totalDue, splitSettled(totals.totalSettled, totals.totalAdjusted), totals.totalPending, totals.totalAdvanceHeld)
                 } else {
                     Totals(
                         billed = bills.sumOf { it.totalDue },
-                        collected = bills.sumOf { it.totalDue - it.pendingAmount },
+                        money = bills.fold(SettledSplit(0.0, 0.0)) { sum, bill -> sum + bill.settledSplit },
                         due = bills.sumOf { it.pendingAmount },
                         advance = bills.sumOf { it.advanceLeft }
                     )
@@ -357,26 +360,32 @@ fun RentCollectionScreen(
     }
 }
 
-/** Billed, collected (money received plus advance used), still due and advance not used yet. */
-private data class Totals(val billed: Double, val collected: Double, val due: Double, val advance: Double)
+/** Billed, the covered part as money and expenses taken off, still due and advance not used yet. */
+private data class Totals(val billed: Double, val money: SettledSplit, val due: Double, val advance: Double)
 
 /* ------------------------------ Summary ------------------------------ */
 
 @Composable
 private fun SummaryCard(totals: Totals, unpaid: Int, title: String) {
-    val percent = if (totals.billed > 0) (totals.collected / totals.billed * 100).roundToInt() else 0
+    val (collected, adjusted) = totals.money
+    // Settled: collected plus expenses taken off
+    val percent = if (totals.billed > 0) ((collected + adjusted) / totals.billed * 100).roundToInt() else 0
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { Caps(title) }
             Text("$percent%", style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
         }
         Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(inr(totals.collected), style = RfType.HeadlineMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
+            Text(inr(collected), style = RfType.HeadlineMd.copy(fontWeight = FontWeight.ExtraBold), color = Rf.Secondary)
             Text("of ${inr(totals.billed)} billed", style = RfType.LabelMd, color = Rf.OnSurfaceVariant, modifier = Modifier.padding(bottom = 3.dp))
         }
-        Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(7.dp).clip(CircleShape).background(Rf.Container)) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(percent.coerceIn(0, 100) / 100f).clip(CircleShape).background(Rf.Secondary))
+        if (adjusted > 0) {
+            Text(
+                "+ ${inr(adjusted)} expenses taken off", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Amber,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
+        PartsBar(listOf(collected to Rf.Secondary, adjusted to Rf.Amber), totals.billed, 7.dp, Modifier.padding(top = 10.dp))
         HorizontalDivider(thickness = 1.dp, color = Rf.Low, modifier = Modifier.padding(top = 12.dp))
         Row(Modifier.padding(top = 10.dp).height(IntrinsicSize.Min)) {
             Column(Modifier.weight(1f)) {
@@ -603,13 +612,35 @@ internal fun CoverBar(bill: BillDto, height: Dp, modifier: Modifier = Modifier) 
     }
 }
 
-/** Advance from earlier bills used on this one, as a small indigo line. */
+/** The web's PartsBar: each part as its share of [whole], side by side from the left. */
+@Composable
+internal fun PartsBar(parts: List<Pair<Double, Color>>, whole: Double, height: Dp, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().height(height).clip(CircleShape).background(Rf.Container)) {
+        if (whole <= 0) return@Row
+        var left = whole
+        parts.forEach { (value, color) ->
+            val part = min(max(value, 0.0), left)
+            if (part > 0) Box(Modifier.weight(part.toFloat()).fillMaxHeight().background(color))
+            left -= part
+        }
+        if (left > 0) Box(Modifier.weight(left.toFloat()).fillMaxHeight())
+    }
+}
+
+/** Advance from earlier bills used on this one in indigo, and expenses the tenant took off in amber. */
 @Composable
 internal fun CreditNote(bill: BillDto) {
-    if (bill.creditApplied <= 0) return
-    Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        LIcon(Lucide.Wallet, size = 12.dp, tint = Rf.Primary)
-        Text("${inr(bill.creditApplied)} from advance", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
+    if (bill.creditApplied > 0) {
+        Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            LIcon(Lucide.Wallet, size = 12.dp, tint = Rf.Primary)
+            Text("${inr(bill.creditApplied)} from advance", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
+        }
+    }
+    if (bill.adjustedAmount > 0) {
+        Row(Modifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            LIcon(Lucide.Wrench, size = 12.dp, tint = Rf.Amber)
+            Text("${inr(bill.adjustedAmount)} expenses taken off", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Amber)
+        }
     }
 }
 

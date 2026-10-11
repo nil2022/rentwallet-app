@@ -118,15 +118,17 @@ internal fun PaymentHistoryCard(
                         WideAction("Record Payment", Lucide.Plus, Rf.Primary, Rf.OnPrimary) { onRecord(null) }
                     }
                     else -> {
-                        // Totals of every bill; advance held only once this tenant has had any
+                        // Totals of every bill; expenses taken off and advance held only once this tenant has had any
                         val hadAdvance = list.any { it.advanceAmount > 0 || it.creditApplied > 0 }
                         val stats = listOfNotNull(
                             Triple("Billed", list.sumOf { it.totalDue }, Rf.OnSurface),
                             Triple("Received", list.sumOf { it.paidAmount }, Rf.Secondary),
+                            list.sumOf { it.adjustedAmount }.takeIf { it > 0 }?.let { Triple("Adjusted", it, Rf.Amber) },
                             list.sumOf { it.pendingAmount }.let { Triple("Still due", it, if (it > 0) Rf.Error else Rf.OnSurface) },
                             if (hadAdvance) Triple("Advance held", list.sumOf { it.advanceLeft }, Rf.Primary) else null
                         )
-                        stats.chunked(if (stats.size == 4) 2 else 3).forEach { row ->
+                        // Two in a row when they pair up, otherwise three
+                        stats.chunked(if (stats.size % 2 == 0) 2 else 3).forEach { row ->
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { (label, value, color) -> HistoryStat(label, inr(value), color, Modifier.weight(1f)) }
                             }
@@ -270,14 +272,16 @@ private fun WideAction(label: String, icon: LucideIcon, background: Color, conte
 private fun shareStatement(context: android.content.Context, tenantName: String, bills: List<BillDto>) {
     val header = listOf(
         "Month", "Rent", "Units", "Electricity", "Other charges", "Total due", "Advance used",
-        "Received", "Still due", "Extra paid (advance)", "Status", "Method", "Payment date", "Notes"
+        "Received", "Expenses taken off", "Still due", "Extra paid (advance)", "Status", "Payments",
+        "Last method", "Last payment date", "Notes"
     )
     val status = mapOf("paid" to "Paid", "partial" to "Partial", "pending" to "Pending")
     val rows = bills.map { b ->
         listOf(
             monthLabel(b.monthYear), b.rent, b.electricity?.unitsConsumed, b.electricity?.amount ?: 0.0,
-            b.otherCharges.sumOf { it.amount }, b.totalDue, b.creditApplied, b.paidAmount, b.pendingAmount, b.advanceAmount,
+            b.otherCharges.sumOf { it.amount }, b.totalDue, b.creditApplied, b.paidAmount, b.adjustedAmount, b.pendingAmount, b.advanceAmount,
             status[b.paymentStatus].orEmpty() + if (b.isOverdue) " (overdue)" else "",
+            b.receipts.count { !it.isDeduction },
             if (b.paidAmount > 0) methodLabel(b.paymentMethod) else "",
             apiDate(b.paymentDate)?.toString().orEmpty(),
             b.notes.orEmpty()
