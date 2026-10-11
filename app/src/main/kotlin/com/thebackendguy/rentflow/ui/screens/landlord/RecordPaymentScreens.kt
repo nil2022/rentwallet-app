@@ -45,7 +45,6 @@ import com.thebackendguy.rentflow.data.AdvanceBill
 import com.thebackendguy.rentflow.data.LandlordStore
 import com.thebackendguy.rentflow.data.PaymentStore
 import com.thebackendguy.rentflow.data.Photo
-import com.thebackendguy.rentflow.data.apiDate
 import com.thebackendguy.rentflow.data.apiMonth
 import com.thebackendguy.rentflow.data.carryAdvance
 import com.thebackendguy.rentflow.data.inr
@@ -235,7 +234,6 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
     var method by rememberSaveable { mutableStateOf("upi") }
     var dateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     var proof by rememberSaveable { mutableStateOf<Uri?>(null) }
-    var proofCleared by rememberSaveable { mutableStateOf(false) }
     var notes by rememberSaveable { mutableStateOf<String?>(null) }
     var advanceMode by rememberSaveable { mutableStateOf(false) }
     var filledFromBill by rememberSaveable { mutableStateOf(false) }
@@ -246,7 +244,7 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
         monthText = month
         rent = null; elecOn = false; prev = null; cur = ""; rate = null; photo = null; photoCleared = false
         other = emptyList(); recv = ""; method = "upi"; dateText = LocalDate.now().toString()
-        proof = null; proofCleared = false; notes = null; advanceMode = false; submitted = false
+        proof = null; notes = null; advanceMode = false; submitted = false
     }
 
     // Editing starts from the saved bill, once it has loaded
@@ -261,9 +259,6 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
         cur = bill.electricity?.let { amountText(it.currentReading) }.orEmpty()
         rate = bill.electricity?.let { amountText(it.ratePerUnit) }
         other = bill.otherCharges.map { Charge(it.name, amountText(it.amount)) }
-        recv = if (bill.paidAmount > 0) amountText(bill.paidAmount) else ""
-        method = bill.paymentMethod ?: "upi"
-        dateText = apiDate(bill.paymentDate)?.toString() ?: LocalDate.now().toString()
         notes = bill.notes.orEmpty()
     }
 
@@ -304,13 +299,15 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
     // `existing` is the bill whose payment is being collected; while editing, the charges are the form's own
     val existing = if (isEdit) null else bills.find { it.monthYear == monthText }
     val isPaidUp = existing?.paymentStatus == "paid"
-    val showPayment = !isPaidUp || advanceMode
+    // Editing changes the charges and note only: payments are entries of the bill now
+    val showPayment = !isEdit && (!isPaidUp || advanceMode)
     val last = roomBills.orEmpty().sortedByDescending { it.monthYear }.firstOrNull { it.electricity != null && it.monthYear < monthText }
 
     val rentValue = rent ?: roomRent?.let(::amountText).orEmpty()
     val prevValue = prev ?: last?.electricity?.currentReading?.let(::amountText).orEmpty()
     val rateValue = rate ?: last?.electricity?.ratePerUnit?.let(::amountText).orEmpty()
-    val notesValue = notes ?: existing?.notes.orEmpty()
+    // The bill's note (new bill, edit), or this payment's own note (collect)
+    val notesValue = notes.orEmpty()
     val received = num(recv)
     val charges = other.filter { it.name.isNotBlank() || it.amount.isNotEmpty() }
 
@@ -325,20 +322,21 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
         electricity = existing.electricity?.amount ?: 0.0
         otherTotal = existing.otherCharges.sumOf { it.amount }
         total = existing.totalDue
-        paidBefore = existing.paidAmount
+        // Money received plus expenses the tenant paid and took off
+        paidBefore = existing.settledByTenant
     } else {
         units = if (elecOn && cur.isNotEmpty()) max(round2(num(cur) - num(prevValue)), 0.0) else 0.0
         electricity = if (elecOn && cur.isNotEmpty()) round2(units * num(rateValue)) else 0.0
         otherTotal = charges.sumOf { num(it.amount) }
         total = round2(num(rentValue) + electricity + otherTotal)
-        paidBefore = 0.0
+        paidBefore = editBill?.settledByTenant ?: 0.0
     }
-    // Editing sets the total received; collecting adds to what was received before
-    val paidAfter = round2(if (existing != null) paidBefore + received else received)
+    // Editing keeps what was paid and taken off; collecting adds to it
+    val paidAfter = round2(if (existing != null || isEdit) paidBefore + received else received)
 
     // Advance, with the backend's rules on this tenant's bills
     val selfId = existing?.id ?: editBill?.id ?: "new"
-    val others = bills.filter { it.id != selfId && it.monthYear != monthText }.map { AdvanceBill(it.id, it.monthYear, it.totalDue, it.paidAmount) }
+    val others = bills.filter { it.id != selfId && it.monthYear != monthText }.map { AdvanceBill(it.id, it.monthYear, it.totalDue, it.settledByTenant) }
     fun run(paid: Double) = carryAdvance(others + AdvanceBill(selfId, monthText, total, paid))
     val self = run(0.0).first { it.id == selfId }
     val credit = self.credit
@@ -392,22 +390,41 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                     is ApiResult.Ok -> r.value
                 }
             } else null
-            val proofKey = if (received > 0 && proof != null) {
+            val proofKey = if (!isEdit && received > 0 && proof != null) {
                 when (val r = Uploads.upload(context, proof!!, UploadFolder.PaymentProof)) {
                     is ApiResult.Fail -> { Toasts.error(r.message); saving = false; return@launch }
                     is ApiResult.Ok -> r.value
                 }
             } else null
 
-            // How and when the money came, only when some did
+            // The month already has a bill: this money is one more payment of it
+            if (existing != null) {
+                val result = PaymentStore.addReceipt(existing.id) {
+                    put("kind", "payment")
+                    put("amount", received)
+                    put("method", method)
+                    put("date", dateText)
+                    proofKey?.let { put("proof", it) }
+                    notesValue.trim().takeIf(String::isNotEmpty)?.let { put("notes", it) }
+                }
+                when (result) {
+                    is ApiResult.Ok -> {
+                        Toasts.show(result.value.message ?: "Payment added")
+                        LandlordStore.refresh()
+                        onDone()
+                    }
+                    is ApiResult.Fail -> Toasts.error(result.message)
+                }
+                saving = false
+                return@launch
+            }
+
+            // How and when the money came with a new bill, only when some did
             fun addPayment(builder: JsonObjectBuilder) = with(builder) {
                 if (received > 0) {
                     put("paymentMethod", method)
                     put("paymentDate", dateText)
-                    when {
-                        proofKey != null -> put("paymentProof", proofKey)
-                        isEdit && proofCleared -> put("paymentProof", JsonNull)
-                    }
+                    proofKey?.let { put("paymentProof", it) }
                 }
             }
             val electricityJson: JsonObject? = if (elecOn) buildJsonObject {
@@ -427,15 +444,7 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                     put("rent", num(rentValue))
                     put("electricity", electricityJson ?: JsonNull)
                     putJsonArray("otherCharges") { charges.forEach { c -> addJsonObject { put("name", c.name.trim()); put("amount", num(c.amount)) } } }
-                    put("paidAmount", received)
-                    addPayment(this)
                     put("notes", notesValue.trim())
-                }
-                existing != null -> buildJsonObject {
-                    put("paymentId", existing.id)
-                    put("paidAmount", round2(existing.paidAmount + received))
-                    addPayment(this)
-                    notes?.let { put("notes", it.trim()) }
                 }
                 else -> buildJsonObject {
                     put("tenantId", tenantId)
@@ -452,9 +461,9 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                     if (notesValue.isNotBlank()) put("notes", notesValue.trim())
                 }
             }
-            when (val r = PaymentStore.save(if (isEdit) editBill!!.id else existing?.id, body)) {
+            when (val r = PaymentStore.save(if (isEdit) editBill!!.id else null, body)) {
                 is ApiResult.Ok -> {
-                    Toasts.show(r.value.message ?: if (isEdit) "Bill updated" else if (existing != null) "Payment recorded" else "Bill saved")
+                    Toasts.show(r.value.message ?: if (isEdit) "Bill updated" else "Bill saved")
                     LandlordStore.refresh()
                     onDone()
                 }
@@ -477,7 +486,7 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
     AppPage(
         topBar = { shell.TopBar(title, onBack = onBack) },
         bottomBar = {
-            if (showPayment) {
+            if (showPayment || isEdit) {
                 FormBar(
                     primary = buttonLabel, onPrimary = ::save, loading = saving,
                     secondary = if (advanceMode) "Back" else "Cancel",
@@ -500,7 +509,10 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                 enabled = !isEdit
             )
             when {
-                isEdit -> Notice("Editing the ${monthLabel(monthText)} bill", "The charges below replace the ones saved. The total and status are worked out again when you save.")
+                isEdit -> Notice(
+                    "Editing the ${monthLabel(monthText)} bill",
+                    "The charges and note below replace the ones saved. Payments and expenses taken off are changed one by one from the bill."
+                )
                 existing != null && isPaidUp -> Notice(
                     "${monthLabel(monthText)} is fully paid",
                     "The bill of ${inr(existing.totalDue)} has been paid in full" + (if (existing.creditApplied > 0) ", ${inr(existing.creditApplied)} of it from advance." else "."),
@@ -509,7 +521,8 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                 existing != null -> Notice(
                     "A bill for ${monthLabel(monthText)} already exists",
                     "Total ${inr(existing.totalDue)}" + (if (existing.creditApplied > 0) ", ${inr(existing.creditApplied)} covered by advance" else "") +
-                        ", received ${inr(existing.paidAmount)}, still due ${inr(existing.pendingAmount)}. Enter the amount received now."
+                        ", received ${inr(existing.paidAmount)}" + (if (existing.adjustedAmount > 0) ", ${inr(existing.adjustedAmount)} expenses taken off" else "") +
+                        ", still due ${inr(existing.pendingAmount)}. Enter the amount received now."
                 )
                 else -> Notice("No bill for ${monthLabel(monthText)} yet", "Fill in the charges below. If money was received, add it too and both are saved together.")
             }
@@ -623,6 +636,7 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                     existing.otherCharges.forEach { SummaryLine(it.name, inr(it.amount)) }
                     if (existing.creditApplied > 0) SummaryLine("Advance used", "− ${inr(existing.creditApplied)}", labelColor = Rf.Primary)
                     SummaryLine("Received so far", inr(existing.paidAmount))
+                    if (existing.adjustedAmount > 0) SummaryLine("Expenses taken off", "− ${inr(existing.adjustedAmount)}")
                 }
             }
         }
@@ -691,13 +705,23 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                         emptyTitle = "Upload a screenshot or PDF",
                         emptyHint = "A photo of the receipt or a PDF. Photos can be cropped.",
                         picked = proof,
-                        savedUrl = if (isEdit && !proofCleared) editBill?.paymentProof else null,
+                        savedUrl = null,
                         allowPdf = true,
-                        onPick = { proof = it; proofCleared = false },
-                        onClear = { proof = null; proofCleared = true }
+                        onPick = { proof = it },
+                        onClear = { proof = null }
                     )
                 }
-                TextArea("Notes (optional)", notesValue, { notes = it.take(1000) }, "e.g. Balance to be paid next week")
+                TextArea(
+                    if (existing != null) "Note on this payment (optional)" else "Notes (optional)",
+                    notesValue, { notes = it.take(1000) }, "e.g. Balance to be paid next week"
+                )
+            }
+        }
+
+        // Editing: the bill's note (each payment keeps its own)
+        if (isEdit) {
+            FormSection(Lucide.FileText, "Note") {
+                TextArea("Notes (optional)", notesValue, { notes = it.take(1000) }, "e.g. Electricity from the new meter")
             }
         }
 
@@ -716,6 +740,9 @@ fun RecordPaymentScreen(tenantId: String, initialMonth: String?, editBillId: Str
                 if (existing != null && showPayment) {
                     SummaryLine("Received before", inr(paidBefore))
                     if (received > 0) SummaryLine("Received now", "+ ${inr(received)}", valueColor = Rf.Secondary)
+                } else if (isEdit && editBill != null) {
+                    SummaryLine("Received", inr(editBill.paidAmount))
+                    if (editBill.adjustedAmount > 0) SummaryLine("Expenses taken off", "− ${inr(editBill.adjustedAmount)}")
                 } else {
                     SummaryLine("Received", inr(received))
                 }

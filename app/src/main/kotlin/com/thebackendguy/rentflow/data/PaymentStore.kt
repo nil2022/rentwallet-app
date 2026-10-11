@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.YearMonth
@@ -254,9 +255,22 @@ object PaymentStore {
         apiCall { api.setMeterPhoto(buildJsonObject { put("paymentId", billId); put("meterPhoto", key) }) }.discard()
     }
 
-    /** Saves a bill's payment proof ([key] null removes it). */
-    suspend fun setProof(billId: String, key: String?): ApiResult<Unit> = changing {
-        apiCall { api.updateBill(buildJsonObject { put("paymentId", billId); put("paymentProof", key) }) }.discard()
+    /**
+     * Adds a payment or an expense deduction to a bill. [fields] adds kind, amount,
+     * date, method, proof, notes, title and category; the bill's id goes in by itself.
+     */
+    suspend fun addReceipt(billId: String, fields: JsonObjectBuilder.() -> Unit): ApiResult<ApiEnvelope<BillDto>> = changing {
+        apiCall { api.addReceipt(buildJsonObject { put("paymentId", billId); fields() }) }
+    }
+
+    /** Changes one entry of a bill; [fields] holds only what changed (null proof removes the photo). */
+    suspend fun updateReceipt(billId: String, receiptId: String, fields: JsonObjectBuilder.() -> Unit): ApiResult<ApiEnvelope<BillDto>> = changing {
+        apiCall { api.updateReceipt(buildJsonObject { put("paymentId", billId); put("receiptId", receiptId); fields() }) }
+    }
+
+    /** Removes one entry of a bill; what is still due goes back up. */
+    suspend fun deleteReceipt(billId: String, receiptId: String): ApiResult<ApiEnvelope<BillDto>> = changing {
+        apiCall { api.deleteReceipt(billId, receiptId) }
     }
 
     suspend fun delete(billId: String): ApiResult<Unit> = changing { apiCall { api.deleteBill(billId) }.discard() }
@@ -272,7 +286,10 @@ object PaymentStore {
 
 fun round2(value: Double): Double = Math.round(value * 100.0) / 100.0
 
-/** A bill as the advance rules see it: what it costs and the money received for it. */
+/**
+ * A bill as the advance rules see it: what it costs and what the tenant covered
+ * themselves ([paid]: money received plus expenses taken off, as the backend counts it).
+ */
 data class AdvanceBill(val id: String, val monthYear: String, val total: Double, val paid: Double)
 
 /**

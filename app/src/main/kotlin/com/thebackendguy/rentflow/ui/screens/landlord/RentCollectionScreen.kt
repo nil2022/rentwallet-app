@@ -581,17 +581,19 @@ internal fun BillStatusPills(bill: BillDto) {
     }
 }
 
-/** How much of a bill is covered: advance used (indigo), then money received (green). */
+/** How much of a bill is covered: advance used (indigo), money received (green), then expenses taken off (amber). */
 @Composable
 internal fun CoverBar(bill: BillDto, height: Dp, modifier: Modifier = Modifier) {
     val total = max(bill.totalDue, 0.0)
     val credit = min(bill.creditApplied, total)
     val paid = min(bill.paidAmount, max(total - credit, 0.0))
-    val rest = max(total - credit - paid, 0.0)
+    val adjusted = min(bill.adjustedAmount, max(total - credit - paid, 0.0))
+    val rest = max(total - credit - paid - adjusted, 0.0)
     Row(modifier.fillMaxWidth().height(height).clip(CircleShape).background(Rf.Container)) {
         if (total <= 0) return@Row
         if (credit > 0) Box(Modifier.weight(credit.toFloat()).fillMaxHeight().background(Rf.Primary))
         if (paid > 0) Box(Modifier.weight(paid.toFloat()).fillMaxHeight().background(Rf.Secondary))
+        if (adjusted > 0) Box(Modifier.weight(adjusted.toFloat()).fillMaxHeight().background(Rf.Amber))
         if (rest > 0) Box(Modifier.weight(rest.toFloat()).fillMaxHeight())
     }
 }
@@ -745,7 +747,7 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     val total = bill.totalDue
-    val settled = min(bill.paidAmount + bill.creditApplied, total)
+    val settled = min(bill.settledByTenant + bill.creditApplied, total)
     val percent = if (total > 0) (settled / total * 100).roundToInt() else 100
     val month = parseApiMonth(bill.monthYear)
     val tenantName = bill.tenant?.fullName ?: "this tenant"
@@ -771,19 +773,17 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
         else -> ""
     }
 
-    fun saveFile(which: String, uri: Uri?) {
+    // Only the meter photo is saved from here: a payment's photo belongs to that payment
+    fun saveMeterPhoto(uri: Uri?) {
         if (saving != null) return
-        saving = which
+        saving = "photo"
         scope.launch {
-            val photo = which == "photo"
-            val key = if (uri == null) null else when (val r = Uploads.upload(context, uri, if (photo) UploadFolder.MeterReading else UploadFolder.PaymentProof)) {
+            val key = if (uri == null) null else when (val r = Uploads.upload(context, uri, UploadFolder.MeterReading)) {
                 is ApiResult.Fail -> { Toasts.error(r.message); saving = null; return@launch }
                 is ApiResult.Ok -> r.value
             }
-            val result = if (photo) PaymentStore.setMeterPhoto(bill.id, key) else PaymentStore.setProof(bill.id, key)
-            val what = if (photo) "Meter photo" else "Payment proof"
-            when (result) {
-                is ApiResult.Ok -> Toasts.show(if (uri != null) "$what saved" else "$what removed")
+            when (val result = PaymentStore.setMeterPhoto(bill.id, key)) {
+                is ApiResult.Ok -> Toasts.show(if (uri != null) "Meter photo saved" else "Meter photo removed")
                 is ApiResult.Fail -> Toasts.error(result.message)
             }
             saving = null
@@ -836,7 +836,7 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                     }
                     CoverBar(bill, 6.dp, Modifier.padding(top = 10.dp))
                     Row(Modifier.padding(top = 6.dp)) {
-                        Text("$percent% collected", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f))
+                        Text(if (bill.adjustedAmount > 0) "$percent% settled" else "$percent% collected", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f))
                         when {
                             bill.advanceAmount > 0 -> Text("${inr(bill.advanceAmount)} extra kept as advance", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
                             bill.pendingAmount > 0 -> Text("${inr(bill.pendingAmount)} left", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Error)
@@ -864,9 +864,10 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
 
                 InfoBox("Payment") {
                     InfoRow("Received", if (bill.paidAmount > 0) inr(bill.paidAmount) else "Nothing yet", first = true, valueColor = if (bill.paidAmount > 0) Rf.Secondary else null)
+                    if (bill.adjustedAmount > 0) InfoRow("Expenses taken off", inr(bill.adjustedAmount), valueColor = Rf.Amber)
                     if (bill.paidAmount > 0) {
-                        InfoRow("Method", methodLabel(bill.paymentMethod))
-                        InfoRow("Date", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
+                        InfoRow("Last method", methodLabel(bill.paymentMethod))
+                        InfoRow("Last payment", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
                     }
                     bill.notes?.takeIf(String::isNotBlank)?.let { InfoRow("Notes", it) }
                 }
@@ -892,8 +893,8 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                     }
                 }
 
-                // Meter photo (for a bill with a reading) and payment proof (once money was received)
-                val showProof = bill.paidAmount > 0
+                // Meter photo (for a bill with a reading) and the latest payment's proof (read here, changed on the payment)
+                val showProof = bill.paymentProof != null
                 if (bill.electricity != null || showProof) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Caps("Attachments")
@@ -901,18 +902,18 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                             if (bill.electricity != null) {
                                 AttachmentSlot(
                                     "Meter photo", bill.electricity.meterPhoto, allowPdf = false, busy = saving == "photo", modifier = Modifier.weight(1f),
-                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveFile("photo", it) }, onRemove = { saveFile("photo", null) }
+                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveMeterPhoto(it) }, onRemove = { saveMeterPhoto(null) }
                                 )
                             }
                             if (showProof) {
                                 AttachmentSlot(
-                                    "Payment proof", bill.paymentProof, allowPdf = true, busy = saving == "proof", modifier = Modifier.weight(1f),
-                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveFile("proof", it) }, onRemove = { saveFile("proof", null) }
+                                    "Payment proof", bill.paymentProof, allowPdf = true, busy = false, modifier = Modifier.weight(1f), readOnly = true,
+                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = {}, onRemove = {}
                                 )
                             }
                             if (bill.electricity == null || !showProof) Box(Modifier.weight(1f))
                         }
-                        Text("A change is saved to this bill right away.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+                        if (bill.electricity != null) Text("A new meter photo is saved to this bill right away.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
                     }
                 }
             }
@@ -1034,7 +1035,8 @@ private fun AttachmentSlot(
     modifier: Modifier,
     onOpen: (String) -> Unit,
     onPick: (Uri) -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    readOnly: Boolean = false
 ) {
     val choose = photoChooser(
         title = label,
@@ -1046,7 +1048,14 @@ private fun AttachmentSlot(
     ) { uris -> onPick(uris.first()) }
     val shape = RoundedCornerShape(12.dp)
     Box(
-        modifier.height(96.dp).pressable(if (busy) null else choose, pressScale = 0.97f).clip(shape)
+        modifier.height(96.dp).pressable(
+            when {
+                busy -> null
+                readOnly -> url?.let { { onOpen(it) } }
+                else -> choose
+            },
+            pressScale = 0.97f
+        ).clip(shape)
             .background(Rf.Low).then(if (url == null) Modifier.dashedBorder(Rf.OutlineVariant) else Modifier)
     ) {
         when {

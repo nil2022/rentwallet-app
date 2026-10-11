@@ -55,9 +55,28 @@ interface PaymentApi {
     @POST("landlord/payment")
     suspend fun createBill(@Body body: JsonObject): ApiEnvelope<BillDto>
 
-    /** Changes a bill; `paymentId` goes in the body. The tenant's advance is worked out again. */
+    /**
+     * Changes a bill's charges and note; `paymentId` goes in the body. Money received
+     * can't be changed here any more (the API rejects it): use the receipt calls below.
+     */
     @PATCH("landlord/payment")
     suspend fun updateBill(@Body body: JsonObject): ApiEnvelope<BillDto>
+
+    /**
+     * Adds one entry to a bill: `{ paymentId, kind, amount, date, method, proof, notes,
+     * category, title }`. A "payment" needs a method; a "deduction" (an expense the
+     * tenant paid and took off the rent) needs a title. Returns the whole bill.
+     */
+    @POST("landlord/payment/receipt")
+    suspend fun addReceipt(@Body body: JsonObject): ApiEnvelope<BillDto>
+
+    /** Changes one entry: `{ paymentId, receiptId, ...fields }`; the kind can't change. Returns the bill. */
+    @PATCH("landlord/payment/receipt")
+    suspend fun updateReceipt(@Body body: JsonObject): ApiEnvelope<BillDto>
+
+    /** Removes one entry; what is still due goes back up. Returns the bill. */
+    @DELETE("landlord/payment/{paymentId}/receipt/{receiptId}")
+    suspend fun deleteReceipt(@Path("paymentId") paymentId: String, @Path("receiptId") receiptId: String): ApiEnvelope<BillDto>
 
     /** Adds, replaces or (null) removes the meter photo: `{ paymentId, meterPhoto }`. */
     @PUT("landlord/payment/meter-photo")
@@ -104,9 +123,35 @@ data class CreditSourceDto(
 )
 
 /**
- * One month's bill. [creditApplied] is advance from earlier bills used on it,
- * [advanceAmount] what was paid beyond it, [advanceLeft] the part of that no later
- * bill has used yet. [paymentStatus] is pending, partial or paid.
+ * One entry against a bill: money the tenant paid ([kind] "payment", with a [method]),
+ * or an expense the tenant paid for the landlord and took off the rent ("deduction",
+ * with a [title] and [category]). [proof] is a link to the payment screenshot or the
+ * shop bill. [id] is null for a bill saved before entries existed: its one payment
+ * shows as an entry but can't be changed on its own.
+ */
+@Serializable
+data class ReceiptDto(
+    @SerialName("_id") val id: String? = null,
+    val kind: String = "payment",
+    @Serializable(with = LenientDouble::class) val amount: Double = 0.0,
+    val method: String? = null,
+    val date: String? = null,
+    val proof: String? = null,
+    val notes: String? = null,
+    val category: String? = null,
+    val title: String? = null,
+    val createdAt: String? = null
+) {
+    val isDeduction: Boolean get() = kind == "deduction"
+}
+
+/**
+ * One month's bill. [receipts] are its payments and expense deductions, newest first;
+ * [paidAmount] adds up the payments and [adjustedAmount] the deductions.
+ * [creditApplied] is advance from earlier bills used on it, [advanceAmount] what was
+ * paid beyond it, [advanceLeft] the part of that no later bill has used yet.
+ * [paymentStatus] is pending, partial or paid. [paymentMethod], [paymentDate] and
+ * [paymentProof] are the latest payment's.
  */
 @Serializable
 data class BillDto(
@@ -123,6 +168,8 @@ data class BillDto(
     val otherCharges: List<OtherChargeDto> = emptyList(),
     @Serializable(with = LenientDouble::class) val totalDue: Double = 0.0,
     @Serializable(with = LenientDouble::class) val paidAmount: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val adjustedAmount: Double = 0.0,
+    val receipts: List<ReceiptDto> = emptyList(),
     @Serializable(with = LenientDouble::class) val creditApplied: Double = 0.0,
     val creditSources: List<CreditSourceDto> = emptyList(),
     @Serializable(with = LenientDouble::class) val pendingAmount: Double = 0.0,
@@ -133,7 +180,10 @@ data class BillDto(
     val paymentDate: String? = null,
     val paymentProof: String? = null,
     val notes: String? = null
-)
+) {
+    /** What covers the bill besides advance: money received plus expenses taken off. */
+    val settledByTenant: Double get() = paidAmount + adjustedAmount
+}
 
 /** One month of Rent History (or the whole range, with an empty [monthYear]). */
 @Serializable
@@ -145,7 +195,8 @@ data class MonthTotalsDto(
     @Serializable(with = LenientDouble::class) val totalPending: Double = 0.0,
     @Serializable(with = LenientDouble::class) val totalSettled: Double = 0.0,
     @Serializable(with = LenientDouble::class) val totalCreditApplied: Double = 0.0,
-    @Serializable(with = LenientDouble::class) val totalAdvanceHeld: Double = 0.0
+    @Serializable(with = LenientDouble::class) val totalAdvanceHeld: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalAdjusted: Double = 0.0
 )
 
 @Serializable
@@ -153,7 +204,8 @@ data class BillSummaryDto(val months: List<MonthTotalsDto> = emptyList(), val to
 
 /**
  * Totals of every bill a list matched. [totalSettled] is the part of the bills
- * that is covered (money received plus advance used, never more than billed).
+ * that is covered (money received, expenses taken off and advance used, never more
+ * than billed); [totalAdjusted] is the expenses the tenants paid and took off.
  */
 @Serializable
 data class BillTotalsDto(
@@ -162,5 +214,6 @@ data class BillTotalsDto(
     @Serializable(with = LenientDouble::class) val totalPending: Double = 0.0,
     @Serializable(with = LenientDouble::class) val totalSettled: Double = 0.0,
     @Serializable(with = LenientDouble::class) val totalCreditApplied: Double = 0.0,
-    @Serializable(with = LenientDouble::class) val totalAdvanceHeld: Double = 0.0
+    @Serializable(with = LenientDouble::class) val totalAdvanceHeld: Double = 0.0,
+    @Serializable(with = LenientDouble::class) val totalAdjusted: Double = 0.0
 )

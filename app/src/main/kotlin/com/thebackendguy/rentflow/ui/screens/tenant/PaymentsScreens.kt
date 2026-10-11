@@ -245,7 +245,7 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
     val context = LocalContext.current
     var viewing by remember { mutableStateOf<String?>(null) }
     val total = bill.totalDue
-    val settled = minOf(bill.paidAmount + bill.creditApplied, total)
+    val settled = minOf(bill.settledByTenant + bill.creditApplied, total)
     val percent = if (total > 0) (settled / total * 100).roundToInt() else 100
 
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 12.dp) {
@@ -298,9 +298,10 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
 
     InfoBox("Payment") {
         InfoRow("Received", if (bill.paidAmount > 0) inr(bill.paidAmount) else "Nothing yet", first = true, valueColor = if (bill.paidAmount > 0) Rf.Secondary else null)
+        if (bill.adjustedAmount > 0) InfoRow("Expenses taken off", inr(bill.adjustedAmount), valueColor = Rf.Amber)
         if (bill.paidAmount > 0) {
-            InfoRow("Method", methodLabel(bill.paymentMethod))
-            InfoRow("Date", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
+            InfoRow("Last method", methodLabel(bill.paymentMethod))
+            InfoRow("Last payment", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
         }
         bill.notes?.takeIf(String::isNotBlank)?.let { InfoRow("Notes", it) }
     }
