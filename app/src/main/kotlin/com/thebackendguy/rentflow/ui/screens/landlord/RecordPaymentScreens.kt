@@ -172,14 +172,14 @@ private val ChargesSaver = listSaver<List<Charge>, String>(
 )
 
 private val QuickCharges = listOf("WiFi", "Gas", "Maintenance", "Water")
-private val Methods = listOf(Triple("cash", "Cash", Lucide.Banknote), Triple("upi", "UPI", Lucide.Smartphone), Triple("cheque", "Cheque", Lucide.Landmark))
+internal val Methods = listOf(Triple("cash", "Cash", Lucide.Banknote), Triple("upi", "UPI", Lucide.Smartphone), Triple("cheque", "Cheque", Lucide.Landmark))
 
-private fun num(text: String?): Double = text?.toDoubleOrNull() ?: 0.0
+internal fun num(text: String?): Double = text?.toDoubleOrNull() ?: 0.0
 
 /** "4000" or "12.5", for a field filled in from a saved amount. */
-private fun amountText(value: Double): String = if (value % 1.0 == 0.0) value.roundToLong().toString() else value.toString()
+internal fun amountText(value: Double): String = if (value % 1.0 == 0.0) value.roundToLong().toString() else value.toString()
 
-private fun decimalInput(text: String): String = text.filter { it.isDigit() || it == '.' }.take(10)
+internal fun decimalInput(text: String): String = text.filter { it.isDigit() || it == '.' }.take(10)
 
 /**
  * The web's Record Payment form, for the three things a landlord does with a tenant's bill:
@@ -794,7 +794,7 @@ private fun QuickChip(label: String, selected: Boolean = false, onClick: () -> U
 }
 
 @Composable
-private fun MethodButton(label: String, icon: LucideIcon, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun MethodButton(label: String, icon: LucideIcon, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(11.dp)
     Row(
         modifier.height(42.dp).pressable(onClick, pressScale = 0.97f).clip(shape)
@@ -847,7 +847,7 @@ private fun SummaryLine(
  * "Change" and "Remove". [picked] is a new file, [savedUrl] the one saved on the bill.
  */
 @Composable
-private fun FileField(
+internal fun FileField(
     label: String,
     emptyTitle: String,
     emptyHint: String,

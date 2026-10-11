@@ -87,6 +87,7 @@ fun TenantDetailsScreen(
     onOpenTenant: (String) -> Unit,
     onRecordPayment: (month: String?) -> Unit,
     onEditBill: (billId: String) -> Unit,
+    onBillEntry: (billId: String, mode: String) -> Unit,
     onDeleted: () -> Unit
 ) {
     val state = portfolioState()
@@ -124,7 +125,7 @@ fun TenantDetailsScreen(
             )
             RoomTenancyCard(tenant, room, property, roomName, firstName, roommates.size + 1, onOpenProperty, onAssignRoom)
             if (roomId != null) RoommatesCard(roommates, roomName, firstName, solo = roomCapacity(tenant.room?.occupancyType ?: room?.occupancyType) == 1, onOpenTenant)
-            PaymentHistoryCard(bills, billsError, tenant.fullName, onRecord = onRecordPayment, onEditBill = onEditBill)
+            PaymentHistoryCard(bills, billsError, tenant.fullName, onRecord = onRecordPayment, onEditBill = onEditBill, onBillEntry = onBillEntry)
             ContactCard(tenant, onAddEmail = onEdit)
             TenancyActionsCard(
                 inRoom = roomId != null, roomName = roomName, firstName = firstName,

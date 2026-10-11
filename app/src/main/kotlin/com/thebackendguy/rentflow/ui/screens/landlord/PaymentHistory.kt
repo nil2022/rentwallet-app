@@ -83,12 +83,14 @@ internal fun PaymentHistoryCard(
     error: String?,
     tenantName: String,
     onRecord: (String?) -> Unit,
-    onEditBill: (String) -> Unit
+    onEditBill: (String) -> Unit,
+    onBillEntry: (billId: String, mode: String) -> Unit
 ) {
     val context = LocalContext.current
     var filter by rememberSaveable { mutableStateOf("all") }
     var shown by rememberSaveable { mutableIntStateOf(PAGE) }
-    var openId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Coming back from a bill's entry form opens that bill again
+    var openId by rememberSaveable { mutableStateOf(ReopenBill.take()) }
 
     RfCard(shape = RoundedCornerShape(16.dp), padding = PaddingValues(16.dp), spacing = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -150,7 +152,7 @@ internal fun PaymentHistoryCard(
                             Column {
                                 rows.take(shown).forEachIndexed { index, bill ->
                                     if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
-                                    HistoryRow(bill, onOpen = { openId = bill.id }, onCollect = { onRecord(bill.monthYear) })
+                                    HistoryRow(bill, onOpen = { openId = bill.id }, onCollect = { onBillEntry(bill.id, ENTRY_PAYMENT) })
                                 }
                             }
                         }
@@ -170,9 +172,10 @@ internal fun PaymentHistoryCard(
         BillSheet(
             openBill,
             onDismiss = { openId = null },
-            onCollect = {
+            onEntry = { mode ->
+                ReopenBill.set(openBill.id)
                 openId = null
-                onRecord(openBill.monthYear)
+                onBillEntry(openBill.id, mode)
             },
             onEdit = {
                 openId = null

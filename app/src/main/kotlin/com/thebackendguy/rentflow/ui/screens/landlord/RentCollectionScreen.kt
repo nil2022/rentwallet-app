@@ -55,6 +55,7 @@ import com.thebackendguy.rentflow.data.Loadable
 import com.thebackendguy.rentflow.data.PaymentStore
 import com.thebackendguy.rentflow.data.Photo
 import com.thebackendguy.rentflow.data.apiDate
+import com.thebackendguy.rentflow.data.categoryLabel
 import com.thebackendguy.rentflow.data.apiMonth
 import com.thebackendguy.rentflow.data.inr
 import com.thebackendguy.rentflow.data.isOverdue
@@ -65,6 +66,7 @@ import com.thebackendguy.rentflow.data.monthLabel
 import com.thebackendguy.rentflow.data.parseApiMonth
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.BillDto
+import com.thebackendguy.rentflow.data.remote.ReceiptDto
 import com.thebackendguy.rentflow.data.remote.PropertyDto
 import com.thebackendguy.rentflow.data.remote.TenantDto
 import com.thebackendguy.rentflow.data.shortLabel
@@ -143,6 +145,7 @@ fun RentCollectionScreen(
     shell: Shell,
     onRecord: () -> Unit,
     onRecordFor: (tenantId: String, month: String) -> Unit,
+    onBillEntry: (billId: String, mode: String) -> Unit,
     onEditBill: (tenantId: String, billId: String) -> Unit,
     onHistory: () -> Unit
 ) {
@@ -155,7 +158,8 @@ fun RentCollectionScreen(
     var searching by rememberSaveable { mutableStateOf(false) }
     var overdueView by rememberSaveable { mutableStateOf(CollectionMemory.overdueView) }
     var notBilledOpen by rememberSaveable { mutableStateOf(false) }
-    var openBillId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Coming back from a bill's entry form opens that bill again
+    var openBillId by rememberSaveable { mutableStateOf(ReopenBill.take()) }
     var choosingMonth by remember { mutableStateOf(false) }
     var choosingProperty by remember { mutableStateOf(false) }
     val month = parseApiMonth(monthText) ?: now
@@ -309,7 +313,7 @@ fun RentCollectionScreen(
                         }
                     } else {
                         rows.forEach { bill ->
-                            BillCard(bill, showMonth = overdueView, onOpen = { openBillId = bill.id }, onCollect = { onRecordFor(bill.tenantId, bill.monthYear) })
+                            BillCard(bill, showMonth = overdueView, onOpen = { openBillId = bill.id }, onCollect = { onBillEntry(bill.id, ENTRY_PAYMENT) })
                         }
                     }
 
@@ -334,9 +338,10 @@ fun RentCollectionScreen(
                     BillSheet(
                         openBill,
                         onDismiss = { openBillId = null },
-                        onCollect = {
+                        onEntry = { mode ->
+                            ReopenBill.set(openBill.id)
                             openBillId = null
-                            onRecordFor(openBill.tenantId, openBill.monthYear)
+                            onBillEntry(openBill.id, mode)
                         },
                         onEdit = {
                             openBillId = null
@@ -733,13 +738,15 @@ private fun PropertyRow(name: String, selected: Boolean, onClick: () -> Unit) {
 /* ------------------------------ Bill details ------------------------------ */
 
 /**
- * One bill in full, as the web's bill drawer on a phone: totals, breakdown, payment,
- * advance and files, then Collect, Delete and Edit bill. The meter photo and payment
- * proof can be added, changed or removed here; each change is saved right away.
+ * One bill in full, as the web's bill dialog on a phone: totals, every payment and
+ * expense deduction, breakdown, advance and the meter photo, then Collect (or Add
+ * payment), Delete, Edit bill and Deduct. [onEntry] opens the entry form with
+ * [ENTRY_PAYMENT], [ENTRY_DEDUCTION] or "[EDIT_ENTRY]<id>". The meter photo is saved
+ * from here right away; a payment's photo belongs to that payment.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Unit, onEdit: () -> Unit, onDeleted: () -> Unit) {
+internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onEntry: (String) -> Unit, onEdit: () -> Unit, onDeleted: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var viewing by remember { mutableStateOf<String?>(null) }
@@ -829,10 +836,25 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                 }
 
                 Column {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
-                        Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
-                        Figure("Still due", inr(bill.pendingAmount), if (bill.pendingAmount > 0) Rf.Error else Rf.Secondary, Modifier.weight(1f))
+                    // Adjusted (expenses the tenant paid and took off) shows only when there are some
+                    val due = if (bill.pendingAmount > 0) Rf.Error else Rf.Secondary
+                    if (bill.adjustedAmount > 0) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
+                                Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Figure("Adjusted", inr(bill.adjustedAmount), Rf.Amber, Modifier.weight(1f))
+                                Figure("Still due", inr(bill.pendingAmount), due, Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
+                            Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
+                            Figure("Still due", inr(bill.pendingAmount), due, Modifier.weight(1f))
+                        }
                     }
                     CoverBar(bill, 6.dp, Modifier.padding(top = 10.dp))
                     Row(Modifier.padding(top = 6.dp)) {
@@ -844,6 +866,12 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                         }
                     }
                 }
+
+                BillEntries(
+                    bill,
+                    onOpenProof = { url -> openAttachment(context, url) { viewing = it } },
+                    onOpen = { receipt -> receipt.id?.let { onEntry("$EDIT_ENTRY$it") } }
+                )
 
                 InfoBox("Breakdown") {
                     InfoRow("Rent", inr(bill.rent), first = true)
@@ -862,14 +890,8 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                     }
                 }
 
-                InfoBox("Payment") {
-                    InfoRow("Received", if (bill.paidAmount > 0) inr(bill.paidAmount) else "Nothing yet", first = true, valueColor = if (bill.paidAmount > 0) Rf.Secondary else null)
-                    if (bill.adjustedAmount > 0) InfoRow("Expenses taken off", inr(bill.adjustedAmount), valueColor = Rf.Amber)
-                    if (bill.paidAmount > 0) {
-                        InfoRow("Last method", methodLabel(bill.paymentMethod))
-                        InfoRow("Last payment", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
-                    }
-                    bill.notes?.takeIf(String::isNotBlank)?.let { InfoRow("Notes", it) }
+                bill.notes?.takeIf(String::isNotBlank)?.let { note ->
+                    InfoBox("Note") { InfoRow(note, "", first = true) }
                 }
 
                 if (bill.advanceAmount > 0) {
@@ -893,27 +915,18 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                     }
                 }
 
-                // Meter photo (for a bill with a reading) and the latest payment's proof (read here, changed on the payment)
-                val showProof = bill.paymentProof != null
-                if (bill.electricity != null || showProof) {
+                // The meter photo of a bill with a reading; payment photos are on the entries above
+                if (bill.electricity != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Caps("Attachments")
+                        Caps("Meter photo")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (bill.electricity != null) {
-                                AttachmentSlot(
-                                    "Meter photo", bill.electricity.meterPhoto, allowPdf = false, busy = saving == "photo", modifier = Modifier.weight(1f),
-                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveMeterPhoto(it) }, onRemove = { saveMeterPhoto(null) }
-                                )
-                            }
-                            if (showProof) {
-                                AttachmentSlot(
-                                    "Payment proof", bill.paymentProof, allowPdf = true, busy = false, modifier = Modifier.weight(1f), readOnly = true,
-                                    onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = {}, onRemove = {}
-                                )
-                            }
-                            if (bill.electricity == null || !showProof) Box(Modifier.weight(1f))
+                            AttachmentSlot(
+                                "Meter photo", bill.electricity.meterPhoto, allowPdf = false, busy = saving == "photo", modifier = Modifier.weight(1f),
+                                onOpen = { url -> openAttachment(context, url) { viewing = it } }, onPick = { saveMeterPhoto(it) }, onRemove = { saveMeterPhoto(null) }
+                            )
+                            Box(Modifier.weight(1f))
                         }
-                        if (bill.electricity != null) Text("A new meter photo is saved to this bill right away.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
+                        Text("A new meter photo is saved to this bill right away.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant)
                     }
                 }
             }
@@ -923,12 +936,15 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
                 Modifier.padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (bill.pendingAmount > 0) {
-                    SheetButton("Collect ${inr(bill.pendingAmount)}", Lucide.Plus, Rf.Primary, Rf.OnPrimary, Modifier.fillMaxWidth(), onCollect)
-                }
+                // Collect what is still due; a fully paid bill can still take an advance
+                SheetButton(
+                    if (bill.pendingAmount > 0) "Collect ${inr(bill.pendingAmount)}" else "Add payment",
+                    Lucide.Plus, Rf.Primary, Rf.OnPrimary, Modifier.fillMaxWidth()
+                ) { onEntry(ENTRY_PAYMENT) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SheetButton("Delete", Lucide.Trash2, Rf.ErrorContainer, Rf.Error, Modifier.weight(1f)) { confirmDelete = true }
                     SheetButton("Edit bill", Lucide.Pencil, Rf.Low, Rf.Primary, Modifier.weight(1f), onEdit)
+                    SheetButton("Deduct", Lucide.Wrench, Rf.AmberSoft, Rf.Amber, Modifier.weight(1f)) { onEntry(ENTRY_DEDUCTION) }
                 }
             }
         }
@@ -957,6 +973,112 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onCollect: () -> Un
             },
             onDismiss = { confirmDelete = false }
         )
+    }
+}
+
+/**
+ * Every payment and expense deduction of a bill, newest first, each with its amount,
+ * method or category, number or name, date, note and photo, and what they add up to.
+ * A row with an id opens it to change or remove; one saved before entries existed can't.
+ */
+@Composable
+private fun BillEntries(bill: BillDto, onOpenProof: (String) -> Unit, onOpen: (ReceiptDto) -> Unit) {
+    val receipts = bill.receipts
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Rf.Low, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Caps("Payments & deductions")
+            if (receipts.isNotEmpty()) {
+                Text(
+                    "${receipts.size}", style = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.ExtraBold), color = Rf.OnSurfaceVariant,
+                    modifier = Modifier.clip(CircleShape).background(Rf.Low).padding(horizontal = 7.dp, vertical = 1.dp)
+                )
+            }
+        }
+        if (receipts.isEmpty()) {
+            Text(
+                if (bill.creditApplied > 0) "Nothing received in cash." else "Nothing received yet.",
+                style = RfType.BodySm, color = Rf.OnSurfaceVariant, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp)
+            )
+            return@Column
+        }
+        receipts.forEachIndexed { index, receipt ->
+            if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+            EntryRow(bill, receipt, onOpenProof, onOpen)
+        }
+        HorizontalDivider(thickness = 1.dp, color = Rf.Low)
+        Row(Modifier.padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Received ${inr(bill.paidAmount)}" + if (bill.adjustedAmount > 0) " • Adjusted ${inr(bill.adjustedAmount)}" else "",
+                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f)
+            )
+            Text(
+                "Settled ${inr(min(bill.settledByTenant + bill.creditApplied, bill.totalDue))} of ${inr(bill.totalDue)}",
+                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
+            )
+        }
+        if (receipts.any { it.id != null }) {
+            Text("Tap a row to change or remove it.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun EntryRow(bill: BillDto, receipt: ReceiptDto, onOpenProof: (String) -> Unit, onOpen: (ReceiptDto) -> Unit) {
+    val deduction = receipt.isDeduction
+    val icon = when {
+        deduction -> Lucide.Wrench
+        receipt.method == "upi" -> Lucide.Smartphone
+        receipt.method == "cheque" -> Lucide.Landmark
+        else -> Lucide.Banknote
+    }
+    val date = apiDate(receipt.date)?.shortLabel() ?: "—"
+    Row(
+        Modifier.fillMaxWidth().pressable(if (receipt.id != null) ({ onOpen(receipt) }) else null, pressScale = 0.98f).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (deduction) Rf.AmberSoft else Rf.MintSoft),
+            contentAlignment = Alignment.Center
+        ) {
+            LIcon(icon, size = 16.dp, tint = if (deduction) Rf.Amber else Rf.Secondary)
+        }
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    (if (deduction) "− " else "") + inr(receipt.amount),
+                    style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold), color = if (deduction) Rf.Amber else Rf.OnSurface
+                )
+                Text(
+                    if (deduction) categoryLabel(receipt.category) else methodLabel(receipt.method),
+                    style = RfType.LabelSm.copy(fontSize = 10.sp, fontWeight = FontWeight.ExtraBold),
+                    color = if (deduction) Rf.Amber else Rf.OnSurfaceVariant,
+                    modifier = Modifier.clip(CircleShape).background(if (deduction) Rf.AmberSoft else Rf.Low).padding(horizontal = 7.dp, vertical = 2.dp)
+                )
+            }
+            Text(
+                if (deduction) "${entryTitle(bill, receipt)} • paid by tenant • $date" else "Payment ${entryNumber(bill, receipt)} • $date",
+                style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 2.dp)
+            )
+            receipt.notes?.takeIf(String::isNotBlank)?.let {
+                Text(it, style = RfType.LabelSm, color = Rf.OnSurface, modifier = Modifier.padding(top = 3.dp))
+            }
+            if (receipt.id == null) {
+                Text("Saved before entries", style = RfType.LabelSm.copy(fontSize = 10.sp), color = Rf.Outline, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+        receipt.proof?.let { url ->
+            Box(
+                Modifier.size(40.dp).pressable({ onOpenProof(url) }).clip(RoundedCornerShape(9.dp)).background(Rf.Low),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isPdfLink(url)) LIcon(Lucide.FileText, size = 18.dp, tint = Rf.Error, contentDescription = "Open the PDF")
+                else RemoteImage(url, Modifier.fillMaxSize(), placeholderIcon = Lucide.Image, iconSize = 16.dp)
+            }
+        }
     }
 }
 

@@ -62,7 +62,9 @@ import com.thebackendguy.rentflow.ui.screens.landlord.AddTenantScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.AssignRoomScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.BillTenantPickerScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.RecordPaymentScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.BillEntryScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.ChangePasswordScreen
+import com.thebackendguy.rentflow.ui.screens.landlord.ENTRY_PAYMENT
 import com.thebackendguy.rentflow.ui.screens.landlord.LandlordOverviewScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.LandlordProfileScreen
 import com.thebackendguy.rentflow.ui.screens.landlord.PropertiesScreen
@@ -93,7 +95,7 @@ private enum class Screen {
     Login, ForgotPassword, Register,
     TenantHome, PaymentHistory, TenantBill, TenantProfile,
     LandlordOverview, Properties, PropertyDetails, PropertyForm, Rooms, RoomDetails, RoomForm,
-    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, RentHistory, PickBillTenant, RecordPayment, LandlordProfile, ChangePassword
+    Tenants, TenantDetails, TenantForm, AddTenant, AssignRoom, RentCollection, RentHistory, PickBillTenant, RecordPayment, BillEntry, LandlordProfile, ChangePassword
 }
 
 /** One entry of the back stack: a screen and the ids it shows (see each screen in [RentFlowApp]). */
@@ -440,6 +442,7 @@ private fun RentFlowApp() {
                             onOpenTenant = { go(Screen.TenantDetails, it) },
                             onRecordPayment = { month -> go(Screen.RecordPayment, a, month) },
                             onEditBill = { billId -> go(Screen.RecordPayment, a, "$EDIT_BILL$billId") },
+                            onBillEntry = { billId, mode -> go(Screen.BillEntry, billId, mode) },
                             onDeleted = ::back
                         )
 
@@ -474,6 +477,7 @@ private fun RentFlowApp() {
                             shell = shell,
                             onRecord = { go(Screen.PickBillTenant) },
                             onRecordFor = { tenantId, month -> go(Screen.RecordPayment, tenantId, month) },
+                            onBillEntry = { billId, mode -> go(Screen.BillEntry, billId, mode) },
                             onEditBill = { tenantId, billId -> go(Screen.RecordPayment, tenantId, "$EDIT_BILL$billId") },
                             onHistory = { go(Screen.RentHistory) }
                         )
@@ -498,6 +502,15 @@ private fun RentFlowApp() {
                             tenantId = a.orEmpty(),
                             initialMonth = b?.takeUnless { it.startsWith(EDIT_BILL) },
                             editBillId = b?.takeIf { it.startsWith(EDIT_BILL) }?.removePrefix(EDIT_BILL),
+                            shell = shell,
+                            onBack = ::back,
+                            onDone = ::back
+                        )
+
+                        // a = bill id, b = "payment", "deduction" or "entry:<receipt id>"
+                        Screen.BillEntry -> BillEntryScreen(
+                            billId = a.orEmpty(),
+                            mode = b ?: ENTRY_PAYMENT,
                             shell = shell,
                             onBack = ::back,
                             onDone = ::back

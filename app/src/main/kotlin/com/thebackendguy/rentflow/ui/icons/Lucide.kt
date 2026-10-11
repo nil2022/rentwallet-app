@@ -19,6 +19,7 @@ object Lucide {
     val Check = LucideIcon("check", "M20 6 9 17l-5-5")
     val ChevronDown = LucideIcon("chevron-down", "m6 9 6 6 6-6")
     val ChevronRight = LucideIcon("chevron-right", "m9 18 6-6-6-6")
+    val Wrench = LucideIcon("wrench", "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z")
     val CircleAlert = LucideIcon("circle-alert", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "M12 8L12 12", "M12 16L12.01 16")
     val Save = LucideIcon("save", "M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z", "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7", "M7 3v4a1 1 0 0 0 1 1h7")
     val CircleCheck = LucideIcon("circle-check", "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0", "m9 12 2 2 4-4")

@@ -40,6 +40,13 @@ fun monthLabel(value: String): String = parseApiMonth(value)?.label() ?: value
 /** The API has no due date: a bill from an earlier month that isn't fully paid is overdue. */
 val BillDto.isOverdue: Boolean get() = paymentStatus != "paid" && monthYear < YearMonth.now().apiMonth()
 
+/** What an expense the tenant paid for the landlord was, as the API names it, with the web's labels. */
+val DeductionCategories = listOf(
+    "maintenance" to "Maintenance", "repair" to "Repair", "plumbing" to "Plumbing", "electrical" to "Electrical", "other" to "Other"
+)
+
+fun categoryLabel(category: String?): String = DeductionCategories.find { it.first == category }?.second ?: "Other"
+
 /** Cash, UPI or Cheque. */
 fun methodLabel(method: String?): String = when (method) {
     "cash" -> "Cash"
@@ -234,6 +241,13 @@ object PaymentStore {
         when (val r = apiCall { api.bills(monthYear = month?.apiMonth(), tenantId = tenantId, roomId = roomId, limit = PAGE_SIZE) }) {
             is ApiResult.Fail -> r
             is ApiResult.Ok -> ApiResult.Ok(r.value.data.orEmpty())
+        }
+
+    /** One bill, fresh from the API, with its payments and deductions. */
+    suspend fun bill(id: String): ApiResult<BillDto> =
+        when (val r = apiCall { api.bill(id) }) {
+            is ApiResult.Fail -> r
+            is ApiResult.Ok -> r.value.data?.let { ApiResult.Ok(it) } ?: ApiResult.Fail("The server sent an empty reply. Please try again.")
         }
 
     /** Rent History: totals for every month from [from] to [to], for all properties or [propertyId]. */
