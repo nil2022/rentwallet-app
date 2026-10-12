@@ -20,6 +20,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.core.content.edit
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.icons.LucideIcon
@@ -103,9 +105,21 @@ fun photoChooser(
     // The file the camera writes to; kept across the camera app taking over the screen
     var shot by rememberSaveable { mutableStateOf<Uri?>(null) }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-        val uri = shot ?: return@rememberLauncherForActivityResult
+        val uri = PendingShot.take(context, title) ?: shot ?: return@rememberLauncherForActivityResult
         shot = null
+        if (uri in toCrop) return@rememberLauncherForActivityResult
         if (saved) startCropping(listOf(uri)) else PhotoFiles.discard(context, uri)
+    }
+
+    // Android may close the app while the camera is open (it needs the memory). Back here, the
+    // screen first loads again and its result can miss this chooser, so a shot still waiting
+    // is picked up from its file: a file the camera wrote to is a photo taken, an empty one a
+    // photo cancelled.
+    LaunchedEffect(Unit) {
+        val uri = PendingShot.take(context, title) ?: return@LaunchedEffect
+        shot = null
+        if (uri in toCrop) return@LaunchedEffect
+        if (PhotoFiles.hasContent(context, uri)) startCropping(listOf(uri)) else PhotoFiles.discard(context, uri)
     }
 
     val single = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -150,10 +164,12 @@ fun photoChooser(
                 choosing = false
                 val uri = PhotoFiles.create(context)
                 shot = uri
+                PendingShot.save(context, title, uri)
                 try {
                     camera.launch(uri)
                 } catch (_: ActivityNotFoundException) {
                     shot = null
+                    PendingShot.take(context, title)
                     PhotoFiles.discard(context, uri)
                     Toasts.error("No camera app found on this phone.")
                 }
@@ -298,5 +314,44 @@ internal object PhotoFiles {
     fun discard(context: Context, uri: Uri) {
         if (uri.authority != "${context.packageName}.fileprovider") return
         runCatching { context.contentResolver.delete(uri, null, null) }
+    }
+
+    /** True when something was written to [uri], such as a photo the camera saved. */
+    fun hasContent(context: Context, uri: Uri): Boolean =
+        runCatching { context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize > 0 } == true }.getOrDefault(false)
+}
+
+/**
+ * The camera shot waiting for its result, saved on the phone because Android may
+ * close the app while the camera is open. [key] says which chooser asked for it
+ * (its title), so only that one picks it up when its screen is back.
+ */
+internal object PendingShot {
+    private const val PREFS = "rentflow_camera"
+    private const val KEY = "key"
+    private const val URI = "uri"
+    private const val AT = "at"
+    // A shot older than this was left behind (the app was closed for good), not waiting
+    private const val MAX_AGE_MS = 10 * 60 * 1000L
+
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Written straight away: the app can be closed the moment the camera opens. */
+    fun save(context: Context, key: String, uri: Uri) {
+        prefs(context).edit(commit = true) {
+            putString(KEY, key)
+            putString(URI, uri.toString())
+            putLong(AT, System.currentTimeMillis())
+        }
+    }
+
+    /** The shot [key] is waiting for, forgotten once taken; null if there is none. */
+    fun take(context: Context, key: String): Uri? {
+        val prefs = prefs(context)
+        val uri = prefs.getString(URI, null) ?: return null
+        if (prefs.getString(KEY, null) != key) return null
+        val at = prefs.getLong(AT, 0)
+        prefs.edit(commit = true) { clear() }
+        return if (System.currentTimeMillis() - at > MAX_AGE_MS) null else Uri.parse(uri)
     }
 }
