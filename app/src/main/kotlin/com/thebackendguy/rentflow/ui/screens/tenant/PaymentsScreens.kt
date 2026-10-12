@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +38,6 @@ import com.thebackendguy.rentflow.data.Loadable
 import com.thebackendguy.rentflow.data.Photo
 import com.thebackendguy.rentflow.data.TenantBills
 import com.thebackendguy.rentflow.data.TenantStore
-import com.thebackendguy.rentflow.data.apiDate
 import com.thebackendguy.rentflow.data.inr
 import com.thebackendguy.rentflow.data.isOverdue
 import com.thebackendguy.rentflow.data.isPdfLink
@@ -45,7 +46,6 @@ import com.thebackendguy.rentflow.data.monthLabel
 import com.thebackendguy.rentflow.data.parseApiMonth
 import com.thebackendguy.rentflow.data.remote.ApiResult
 import com.thebackendguy.rentflow.data.remote.BillDto
-import com.thebackendguy.rentflow.data.shortLabel
 import com.thebackendguy.rentflow.ui.components.AppPage
 import com.thebackendguy.rentflow.ui.components.EmptyState
 import com.thebackendguy.rentflow.ui.components.ErrorState
@@ -59,6 +59,8 @@ import com.thebackendguy.rentflow.ui.components.pressable
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.screens.Shell
+import com.thebackendguy.rentflow.ui.screens.landlord.BillEntries
+import com.thebackendguy.rentflow.ui.screens.landlord.BillFigures
 import com.thebackendguy.rentflow.ui.screens.landlord.BillStatusPills
 import com.thebackendguy.rentflow.ui.screens.landlord.Caps
 import com.thebackendguy.rentflow.ui.screens.landlord.CoverBar
@@ -126,11 +128,14 @@ fun TenantBillsScreen(shell: Shell, onOpenBill: (String) -> Unit) {
             }
             val bills = data.bills
             val totals = data.totals
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Figure("Billed", inr(totals?.totalDue ?: bills.sumOf { it.totalDue }), Rf.OnSurface, Modifier.weight(1f))
-                Figure("Received", inr(totals?.totalPaid ?: bills.sumOf { it.paidAmount }), Rf.Secondary, Modifier.weight(1f))
+            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Figure("Billed", inr(totals?.totalDue ?: bills.sumOf { it.totalDue }), Rf.OnSurface, Modifier.weight(1f).fillMaxHeight())
+                Figure(
+                    "Received", inr(totals?.totalPaid ?: bills.sumOf { it.paidAmount }), Rf.Secondary, Modifier.weight(1f).fillMaxHeight(),
+                    sub = data.adjusted.takeIf { it > 0 }?.let { "+ ${inr(it)} expenses" }, subColor = Rf.Amber
+                )
                 val due = totals?.totalPending ?: bills.sumOf { it.pendingAmount }
-                Figure("Still due", inr(due), if (due > 0) Rf.Error else Rf.OnSurface, Modifier.weight(1f))
+                Figure("Still due", inr(due), if (due > 0) Rf.Error else Rf.OnSurface, Modifier.weight(1f).fillMaxHeight())
             }
             val keys = listOf(null, "pending", "partial", "paid")
             val counts = keys.map { key -> bills.count { key == null || it.paymentStatus == key } }
@@ -215,7 +220,8 @@ internal fun Color.compositeOver(base: Color): Color = Color(
 
 /**
  * One bill in full, as the landlord's bill sheet shows it, without Collect, Edit or
- * Delete: totals, breakdown, payment, advance, meter photo and payment proof.
+ * Delete: totals, each payment and expense taken off, breakdown, note, advance and the
+ * meter photo.
  */
 @Composable
 fun TenantBillScreen(billId: String, shell: Shell, onBack: () -> Unit) {
@@ -261,15 +267,14 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
                 BillStatusPills(bill)
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
-            Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
-            Figure("Still due", inr(bill.pendingAmount), if (bill.pendingAmount > 0) Rf.Error else Rf.Secondary, Modifier.weight(1f))
-        }
+        BillFigures(bill)
         Column {
             CoverBar(bill, 6.dp)
             Row(Modifier.padding(top = 6.dp)) {
-                Text("$percent% paid", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f))
+                Text(
+                    if (bill.adjustedAmount > 0) "$percent% settled" else "$percent% paid",
+                    style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f)
+                )
                 when {
                     bill.advanceAmount > 0 -> Text("${inr(bill.advanceAmount)} extra kept as advance", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
                     bill.pendingAmount > 0 -> Text("${inr(bill.pendingAmount)} left to pay", style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = Rf.Error)
@@ -278,6 +283,9 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
             }
         }
     }
+
+    // Each payment and expense, read-only as on the web; only their photos open
+    BillEntries(bill, onOpenProof = { url -> openAttachment(context, url) { viewing = it } }, onOpen = null, paidBy = "you")
 
     InfoBox("Breakdown") {
         InfoRow("Rent", inr(bill.rent), first = true)
@@ -296,14 +304,8 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
         }
     }
 
-    InfoBox("Payment") {
-        InfoRow("Received", if (bill.paidAmount > 0) inr(bill.paidAmount) else "Nothing yet", first = true, valueColor = if (bill.paidAmount > 0) Rf.Secondary else null)
-        if (bill.adjustedAmount > 0) InfoRow("Expenses taken off", inr(bill.adjustedAmount), valueColor = Rf.Amber)
-        if (bill.paidAmount > 0) {
-            InfoRow("Last method", methodLabel(bill.paymentMethod))
-            InfoRow("Last payment", apiDate(bill.paymentDate)?.shortLabel() ?: "—")
-        }
-        bill.notes?.takeIf(String::isNotBlank)?.let { InfoRow("Notes", it) }
+    bill.notes?.takeIf(String::isNotBlank)?.let { note ->
+        InfoBox("Note") { InfoRow(note, "", first = true) }
     }
 
     // Money paid beyond this bill: which later bills used it, and what is still kept
@@ -332,16 +334,13 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
         }
     }
 
-    // The meter photo and payment proof the landlord added
-    val meterPhoto = bill.electricity?.meterPhoto
-    val proof = bill.paymentProof
-    if (meterPhoto != null || proof != null) {
+    // The meter photo the landlord added; payment photos are on the entries above
+    bill.electricity?.meterPhoto?.let { meterPhoto ->
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Caps("Attachments")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                meterPhoto?.let { Attachment("Meter photo", it, Modifier.weight(1f)) { openAttachment(context, it) { url -> viewing = url } } }
-                proof?.let { Attachment("Payment proof", it, Modifier.weight(1f)) { openAttachment(context, it) { url -> viewing = url } } }
-                if (meterPhoto == null || proof == null) Box(Modifier.weight(1f))
+                Attachment("Meter photo", meterPhoto, Modifier.weight(1f)) { openAttachment(context, meterPhoto) { url -> viewing = url } }
+                Box(Modifier.weight(1f))
             }
         }
     }

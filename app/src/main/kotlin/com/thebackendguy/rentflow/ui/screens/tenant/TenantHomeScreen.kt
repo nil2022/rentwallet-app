@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.thebackendguy.rentflow.data.TenantBills
@@ -93,9 +97,13 @@ fun TenantHomeScreen(firstName: String, shell: Shell, onOpenBill: (String) -> Un
             // All-time totals, from the API's summary when it sends one
             val totals = data.totals
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Figure("Billed", inr(totals?.totalDue ?: data.bills.sumOf { it.totalDue }), Rf.OnSurface, Modifier.weight(1f))
-                    Figure("Received", inr(totals?.totalPaid ?: data.bills.sumOf { it.paidAmount }), Rf.Secondary, Modifier.weight(1f))
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Figure("Billed", inr(totals?.totalDue ?: data.bills.sumOf { it.totalDue }), Rf.OnSurface, Modifier.weight(1f).fillMaxHeight())
+                    // Expenses you paid and took off settle bills too, but aren't money received
+                    Figure(
+                        "Received", inr(totals?.totalPaid ?: data.bills.sumOf { it.paidAmount }), Rf.Secondary, Modifier.weight(1f).fillMaxHeight(),
+                        sub = data.adjusted.takeIf { it > 0 }?.let { "+ ${inr(it)} expenses taken off" }, subColor = Rf.Amber
+                    )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val due = totals?.totalPending ?: data.bills.sumOf { it.pendingAmount }
@@ -148,16 +156,27 @@ private fun ThisMonthCard(data: TenantBills, onOpenBill: (String) -> Unit, onOpe
                 style = RfType.HeadlineMd.copy(fontSize = 28.sp, fontWeight = FontWeight.ExtraBold), color = Color.White
             )
         }
-        // How much of the bill is covered, money and advance together
-        val covered = if (current.totalDue > 0) ((current.totalDue - current.pendingAmount) / current.totalDue).toFloat().coerceIn(0f, 1f) else 1f
+        // How much of the bill is covered: money and advance in green, then expenses taken off in amber
+        val total = current.totalDue
+        val covered = if (total > 0) ((total - current.pendingAmount) / total).toFloat().coerceIn(0f, 1f) else 1f
+        val expenses = if (total > 0) (current.adjustedAmount / total).toFloat().coerceIn(0f, covered) else 0f
+        val amber = Color(0xFFFCD34D)
         Row(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.16f))) {
-            if (covered > 0f) Box(Modifier.weight(covered).fillMaxHeight().clip(CircleShape).background(Color(0xFF6EE7B7)))
+            if (covered - expenses > 0f) Box(Modifier.weight(covered - expenses).fillMaxHeight().background(Color(0xFF6EE7B7)))
+            if (expenses > 0f) Box(Modifier.weight(expenses).fillMaxHeight().background(amber))
             if (covered < 1f) Box(Modifier.weight(1f - covered))
         }
         Row {
             Text(
-                "Received ${inr(current.paidAmount)} of ${inr(current.totalDue)}" +
-                    if (current.creditApplied > 0) " • ${inr(current.creditApplied)} advance used" else "",
+                buildAnnotatedString {
+                    append("Received ${inr(current.paidAmount)}")
+                    if (current.adjustedAmount > 0) {
+                        append(" • ")
+                        withStyle(SpanStyle(color = amber, fontWeight = FontWeight.Bold)) { append("${inr(current.adjustedAmount)} expenses") }
+                    }
+                    append(" of ${inr(total)}")
+                    if (current.creditApplied > 0) append(" • ${inr(current.creditApplied)} advance used")
+                },
                 style = RfType.LabelSm, color = faint, modifier = Modifier.weight(1f)
             )
             current.room?.roomNumber?.let { Text("Room $it", style = RfType.LabelSm, color = faint) }

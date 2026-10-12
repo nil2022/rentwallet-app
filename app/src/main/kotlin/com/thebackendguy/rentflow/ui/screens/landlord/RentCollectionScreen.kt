@@ -867,26 +867,7 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onEntry: (String) -
                 }
 
                 Column {
-                    // Adjusted (expenses the tenant paid and took off) shows only when there are some
-                    val due = if (bill.pendingAmount > 0) Rf.Error else Rf.Secondary
-                    if (bill.adjustedAmount > 0) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
-                                Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Figure("Adjusted", inr(bill.adjustedAmount), Rf.Amber, Modifier.weight(1f))
-                                Figure("Still due", inr(bill.pendingAmount), due, Modifier.weight(1f))
-                            }
-                        }
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
-                            Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
-                            Figure("Still due", inr(bill.pendingAmount), due, Modifier.weight(1f))
-                        }
-                    }
+                    BillFigures(bill)
                     CoverBar(bill, 6.dp, Modifier.padding(top = 10.dp))
                     Row(Modifier.padding(top = 6.dp)) {
                         Text(if (bill.adjustedAmount > 0) "$percent% settled" else "$percent% collected", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.weight(1f))
@@ -1011,9 +992,11 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onEntry: (String) -
  * Every payment and expense deduction of a bill, newest first, each with its amount,
  * method or category, number or name, date, note and photo, and what they add up to.
  * A row with an id opens it to change or remove; one saved before entries existed can't.
+ * Without [onOpen] (the tenant's side, as on the web) the list is read-only and only
+ * the photos open; [paidBy] says who paid an expense.
  */
 @Composable
-private fun BillEntries(bill: BillDto, onOpenProof: (String) -> Unit, onOpen: (ReceiptDto) -> Unit) {
+internal fun BillEntries(bill: BillDto, onOpenProof: (String) -> Unit, onOpen: ((ReceiptDto) -> Unit)?, paidBy: String = "tenant") {
     val receipts = bill.receipts
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Rf.Low, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 10.dp)
@@ -1037,7 +1020,7 @@ private fun BillEntries(bill: BillDto, onOpenProof: (String) -> Unit, onOpen: (R
         }
         receipts.forEachIndexed { index, receipt ->
             if (index > 0) HorizontalDivider(thickness = 1.dp, color = Rf.Low)
-            EntryRow(bill, receipt, onOpenProof, onOpen)
+            EntryRow(bill, receipt, onOpenProof, onOpen, paidBy)
         }
         HorizontalDivider(thickness = 1.dp, color = Rf.Low)
         Row(Modifier.padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1050,14 +1033,14 @@ private fun BillEntries(bill: BillDto, onOpenProof: (String) -> Unit, onOpen: (R
                 style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
             )
         }
-        if (receipts.any { it.id != null }) {
+        if (onOpen != null && receipts.any { it.id != null }) {
             Text("Tap a row to change or remove it.", style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }
 
 @Composable
-private fun EntryRow(bill: BillDto, receipt: ReceiptDto, onOpenProof: (String) -> Unit, onOpen: (ReceiptDto) -> Unit) {
+private fun EntryRow(bill: BillDto, receipt: ReceiptDto, onOpenProof: (String) -> Unit, onOpen: ((ReceiptDto) -> Unit)?, paidBy: String) {
     val deduction = receipt.isDeduction
     val icon = when {
         deduction -> Lucide.Wrench
@@ -1067,7 +1050,7 @@ private fun EntryRow(bill: BillDto, receipt: ReceiptDto, onOpenProof: (String) -
     }
     val date = apiDate(receipt.date)?.shortLabel() ?: "—"
     Row(
-        Modifier.fillMaxWidth().pressable(if (receipt.id != null) ({ onOpen(receipt) }) else null, pressScale = 0.98f).padding(vertical = 10.dp),
+        Modifier.fillMaxWidth().pressable(if (receipt.id != null && onOpen != null) ({ onOpen(receipt) }) else null, pressScale = 0.98f).padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -1091,13 +1074,14 @@ private fun EntryRow(bill: BillDto, receipt: ReceiptDto, onOpenProof: (String) -
                 )
             }
             Text(
-                if (deduction) "${entryTitle(bill, receipt)} • paid by tenant • $date" else "Payment ${entryNumber(bill, receipt)} • $date",
+                if (deduction) "${entryTitle(bill, receipt)} • paid by $paidBy • $date" else "Payment ${entryNumber(bill, receipt)} • $date",
                 style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant, modifier = Modifier.padding(top = 2.dp)
             )
             receipt.notes?.takeIf(String::isNotBlank)?.let {
                 Text(it, style = RfType.LabelSm, color = Rf.OnSurface, modifier = Modifier.padding(top = 3.dp))
             }
-            if (receipt.id == null) {
+            // Only matters to whoever could change the other rows
+            if (receipt.id == null && onOpen != null) {
                 Text("Saved before entries", style = RfType.LabelSm.copy(fontSize = 10.sp), color = Rf.Outline, modifier = Modifier.padding(top = 2.dp))
             }
         }
@@ -1133,11 +1117,36 @@ private fun SheetButton(label: String, icon: LucideIcon, background: Color, cont
 internal fun plainNumber(value: Double): String =
     if (value % 1.0 == 0.0) "%,d".format(value.toLong()) else "%,.2f".format(value)
 
+/** Total due, Received and Still due; Adjusted (expenses the tenant paid and took off) only when there are some, two by two. */
 @Composable
-internal fun Figure(label: String, value: String, color: Color, modifier: Modifier) {
+internal fun BillFigures(bill: BillDto) {
+    val due = if (bill.pendingAmount > 0) Rf.Error else Rf.Secondary
+    if (bill.adjustedAmount > 0) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
+                Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Figure("Adjusted", inr(bill.adjustedAmount), Rf.Amber, Modifier.weight(1f))
+                Figure("Still due", inr(bill.pendingAmount), due, Modifier.weight(1f))
+            }
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Figure("Total due", inr(bill.totalDue), Rf.OnSurface, Modifier.weight(1f))
+            Figure("Received", inr(bill.paidAmount), Rf.Secondary, Modifier.weight(1f))
+            Figure("Still due", inr(bill.pendingAmount), due, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+internal fun Figure(label: String, value: String, color: Color, modifier: Modifier, sub: String? = null, subColor: Color = Rf.OnSurfaceVariant) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).background(Rf.Low).padding(10.dp)) {
         Caps(label)
         Text(value, style = RfType.BodyMd.copy(fontWeight = FontWeight.ExtraBold), color = color, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+        sub?.let { Text(it, style = RfType.LabelSm.copy(fontWeight = FontWeight.Bold), color = subColor, modifier = Modifier.padding(top = 2.dp)) }
     }
 }
 

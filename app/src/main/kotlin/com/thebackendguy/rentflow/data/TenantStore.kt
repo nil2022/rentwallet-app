@@ -27,6 +27,9 @@ data class TenantBills(val bills: List<BillDto>, val totals: BillTotalsDto?) {
     val overdue: List<BillDto> = bills.filter { it.isOverdue && it.pendingAmount > 0 }
     val advance: Double = round2(bills.sumOf { it.advanceLeft })
 
+    /** Expenses the tenant paid for the landlord, taken off their bills. */
+    val adjusted: Double = totals?.totalAdjusted ?: round2(bills.sumOf { it.adjustedAmount })
+
     /** The room and property of the newest bill: where the tenant lives as far as the bills say. */
     val latest: BillDto? = bills.firstOrNull()
 }
