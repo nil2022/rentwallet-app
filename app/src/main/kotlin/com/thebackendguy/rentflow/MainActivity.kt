@@ -120,6 +120,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SessionStore.init(applicationContext)
+        // Back after Android closed the app: a session without "Remember me" is in the saved state
+        SessionStore.restoreFrom(savedInstanceState)
         ThemeMode.init(applicationContext)
         Notifications.createChannel(applicationContext)
         Notifications.logToken()
@@ -144,6 +146,11 @@ class MainActivity : ComponentActivity() {
                 RentFlowApp()
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        SessionStore.saveTo(outState)
     }
 
     // Back in the app: pushes may have come while it was away

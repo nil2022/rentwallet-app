@@ -2,6 +2,7 @@ package com.thebackendguy.rentflow.data.session
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Bundle
 import androidx.core.content.edit
 import com.thebackendguy.rentflow.data.UserRole
 import com.thebackendguy.rentflow.data.remote.UserDto
@@ -35,7 +36,8 @@ fun UserDto.toSessionUser(role: UserRole) =
 
 /**
  * The signed-in account and its token. With "Remember me" it's saved on the
- * phone so the app opens signed in; without it, it lasts until the app closes.
+ * phone so the app opens signed in; without it, it lasts until the user closes
+ * the app (see [saveTo]).
  */
 object SessionStore {
     private const val KEY_TOKEN = "token"
@@ -65,21 +67,24 @@ object SessionStore {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("rentflow_session", Context.MODE_PRIVATE)
         settings = context.applicationContext.getSharedPreferences("rentflow_settings", Context.MODE_PRIVATE)
-        val token = prefs.getString(KEY_TOKEN, null)
-        val role = UserRole.entries.find { it.name == prefs.getString(KEY_ROLE, null) }
-        if (token != null && role != null) {
-            _session.value = Session(
-                token,
-                SessionUser(
-                    id = prefs.getString(KEY_ID, "").orEmpty(),
-                    role = role,
-                    name = prefs.getString(KEY_NAME, "").orEmpty(),
-                    email = prefs.getString(KEY_EMAIL, "").orEmpty(),
-                    mobile = prefs.getString(KEY_MOBILE, null),
-                    photo = prefs.getString(KEY_PHOTO, null)
-                )
-            )
-        }
+        _session.value = sessionOf { prefs.getString(it, null) }
+    }
+
+    /**
+     * Keeps a session without "Remember me" in the screen's saved state, so it
+     * survives Android closing the app while it is away (the camera often needs
+     * the memory). That state goes when the user closes the app, and so does the session.
+     */
+    fun saveTo(state: Bundle) {
+        val current = _session.value ?: return
+        if (prefs.contains(KEY_TOKEN)) return // saved on the phone already
+        write(current) { key, value -> state.putString(key, value) }
+    }
+
+    /** The session [saveTo] kept, when Android reopens the app; a saved one comes first. */
+    fun restoreFrom(state: Bundle?) {
+        if (state == null || _session.value != null) return
+        _session.value = sessionOf { state.getString(it) }
     }
 
     /** The role of the last sign-in, for Login to start on; Landlord before the first one. */
@@ -111,12 +116,34 @@ object SessionStore {
     }
 
     private fun save(token: String, user: SessionUser) = prefs.edit {
-        putString(KEY_TOKEN, token)
-        putString(KEY_ROLE, user.role.name)
-        putString(KEY_ID, user.id)
-        putString(KEY_NAME, user.name)
-        putString(KEY_EMAIL, user.email)
-        putString(KEY_MOBILE, user.mobile)
-        putString(KEY_PHOTO, user.photo)
+        write(Session(token, user)) { key, value -> putString(key, value) }
+    }
+
+    /** Each part of [session] under its key, for the prefs or the saved state. */
+    private fun write(session: Session, put: (String, String?) -> Unit) {
+        put(KEY_TOKEN, session.token)
+        put(KEY_ROLE, session.user.role.name)
+        put(KEY_ID, session.user.id)
+        put(KEY_NAME, session.user.name)
+        put(KEY_EMAIL, session.user.email)
+        put(KEY_MOBILE, session.user.mobile)
+        put(KEY_PHOTO, session.user.photo)
+    }
+
+    /** A session read back by key, or null without a token and role. */
+    private fun sessionOf(read: (String) -> String?): Session? {
+        val token = read(KEY_TOKEN) ?: return null
+        val role = UserRole.entries.find { it.name == read(KEY_ROLE) } ?: return null
+        return Session(
+            token,
+            SessionUser(
+                id = read(KEY_ID).orEmpty(),
+                role = role,
+                name = read(KEY_NAME).orEmpty(),
+                email = read(KEY_EMAIL).orEmpty(),
+                mobile = read(KEY_MOBILE),
+                photo = read(KEY_PHOTO)
+            )
+        )
     }
 }

@@ -284,7 +284,7 @@ The app copies the phone design of the RentFlow web app (`rent-management-ui`), 
 | Networking | Retrofit 3, OkHttp 4.12, kotlinx.serialization 1.9 |
 | Images | Coil 3 with 15 s connect / 30 s read timeouts; photos are resized to 1600 px JPEGs before upload |
 | Theme | Light and dark palettes in [`Color.kt`](app/src/main/kotlin/com/thebackendguy/rentflow/ui/theme/Color.kt); the choice is saved in SharedPreferences |
-| Session | Token and account details in SharedPreferences (only with “Remember me”) |
+| Session | Token and account details in SharedPreferences (only with “Remember me”); without it, in the screen’s saved state, so it survives Android closing the app while it is away (such as during the camera) but not the user closing it |
 | Navigation | A back stack of screens in Compose state, no navigation library |
 | Push notifications | Firebase Cloud Messaging (Firebase BoM 34.19, google-services plugin 4.5) |
 
