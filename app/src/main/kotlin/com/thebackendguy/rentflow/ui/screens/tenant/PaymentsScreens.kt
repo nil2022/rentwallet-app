@@ -55,7 +55,10 @@ import com.thebackendguy.rentflow.ui.components.Pill
 import com.thebackendguy.rentflow.ui.components.RemoteImage
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.Segmented
+import com.thebackendguy.rentflow.ui.components.Spinner
+import com.thebackendguy.rentflow.ui.components.TopBarAction
 import com.thebackendguy.rentflow.ui.components.pressable
+import com.thebackendguy.rentflow.ui.components.softShadow
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.screens.Shell
@@ -70,6 +73,7 @@ import com.thebackendguy.rentflow.ui.screens.landlord.InfoBox
 import com.thebackendguy.rentflow.ui.screens.landlord.InfoRow
 import com.thebackendguy.rentflow.ui.screens.landlord.openAttachment
 import com.thebackendguy.rentflow.ui.screens.landlord.plainNumber
+import com.thebackendguy.rentflow.ui.screens.landlord.rememberBillDownloader
 import com.thebackendguy.rentflow.ui.theme.Rf
 import com.thebackendguy.rentflow.ui.theme.RfType
 import java.time.format.DateTimeFormatter
@@ -236,10 +240,20 @@ fun TenantBillScreen(billId: String, shell: Shell, onBack: () -> Unit) {
         }
     }
     val bill = fetched ?: listed
+    // The tenant's copy shows the property only: the API doesn't send them the landlord's details
+    val downloader = rememberBillDownloader()
+    val download: (() -> Unit)? = bill?.let { current -> { downloader.download(current, issuedBy = null) } }
 
-    AppPage(topBar = { shell.TopBar(bill?.let { "${monthLabel(it.monthYear)} bill" } ?: "Bill", onBack = onBack) }) {
+    AppPage(
+        topBar = {
+            shell.TopBar(
+                bill?.let { "${monthLabel(it.monthYear)} bill" } ?: "Bill", onBack = onBack,
+                action = download?.let { TopBarAction(Lucide.Download, "Download the bill", busy = downloader.busy, onClick = it) }
+            )
+        }
+    ) {
         when {
-            bill != null -> BillDetails(bill, state.data?.bills.orEmpty())
+            bill != null -> BillDetails(bill, state.data?.bills.orEmpty(), downloading = downloader.busy, onDownload = download ?: {})
             error != null -> ErrorState(error.orEmpty(), onRetry = onBack)
             else -> LoadingCards(2)
         }
@@ -247,7 +261,7 @@ fun TenantBillScreen(billId: String, shell: Shell, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
+private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>, downloading: Boolean, onDownload: () -> Unit) {
     val context = LocalContext.current
     var viewing by remember { mutableStateOf<String?>(null) }
     val total = bill.totalDue
@@ -282,6 +296,17 @@ private fun ColumnScope.BillDetails(bill: BillDto, allBills: List<BillDto>) {
                 }
             }
         }
+    }
+
+    // The bill as an image, saved in Downloads/RentFlow
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).pressable(if (downloading) null else onDownload, pressScale = 0.98f)
+            .softShadow(RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp)).background(Rf.Lowest),
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (downloading) Spinner(Rf.Primary, size = 16.dp) else LIcon(Lucide.Download, size = 16.dp, tint = Rf.Primary)
+        Text(if (downloading) "Making the image…" else "Download bill", style = RfType.LabelMd.copy(fontWeight = FontWeight.Bold), color = Rf.Primary)
     }
 
     // Each payment and expense, read-only as on the web; only their photos open

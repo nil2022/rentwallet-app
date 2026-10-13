@@ -108,6 +108,20 @@ As on the web, wherever bills are added up, **Collected** is the money received 
 - **A tenant’s Payment History:** an **Adjusted** total, the amber line on each bill, and the statement CSV with Expenses taken off, the number of payments, and the last method and date.
 - The Profile’s Collected tile still shows everything settled this month, as on the web.
 
+### Downloading a bill
+
+A bill can be saved as an image (PNG) of one A4 page, to send on WhatsApp or keep ([design mockup](https://claude.ai/artifact/W9SYppmXcaYnsX4YaMmse7)). The web has no bill download yet, so this is the app’s own; a PDF can come later.
+
+| 27 Download from the bill | The saved bill |
+|:---:|:---:|
+| <img src="docs/screenshots/27-bill-download.png" width="200" alt="Bill saved as image"> | <img src="docs/screenshots/bill-image-sample.png" width="300" alt="Sample bill image"> |
+| The download icon next to ✕ saves it straight away; the note offers Open and Share. | Example from the design; the app draws the same page. |
+
+- **Where:** the download icon on the bill sheet (Rent Collection and a tenant’s Payment History), and on a tenant’s bill both the icon at the top and “Download bill” under the totals.
+- **On the page:** RentFlow, “Rent bill”, the month, the bill number (`RF-` year and month, then the end of the bill’s id), the day it was made and a PAID / PARTLY PAID / DUE stamp; who it is billed to and the property, address, room and floor; the breakdown (rent, electricity readings with units × rate, other charges, total, advance used and to pay); every payment and expense taken off, oldest first; total, received, expenses taken off and still due (or advance carried forward, or fully paid); and the note. The landlord’s copy adds “Issued by” with their name and mobile; the tenant’s copy shows the property only, since the API doesn’t send tenants the landlord’s details.
+- **Saved** to Downloads/RentFlow as `RentFlow-Bill-Oct-2026-Rahul-Das.png`, and a note offers **Open** and **Share**. On Android 9, where saving to Downloads needs a storage permission, the share menu opens instead.
+- The page is drawn with Android’s Canvas in the app’s font, at 1240 px wide (A4 at 150 dpi), white in every theme like a printout; a bill with many entries makes a longer page.
+
 | 19 Room: full, Remove | 19 Room with space | 20 Add or Edit Room |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/19-room-let.png" width="220" alt="Full room with the Remove confirmation"> | <img src="docs/screenshots/19-room-vacant.png" width="220" alt="Room with space"> | <img src="docs/screenshots/20-room-form.png" width="220" alt="Add room"> |
@@ -143,7 +157,7 @@ A tenant sees only their own bills (`/tenant/payment`), which their landlord rec
 | 03 Home | 06 Payments | 07 Bill details | 08 Profile |
 |:---:|:---:|:---:|:---:|
 | <img src="docs/screenshots/03-tenant-home.png" width="170" alt="Tenant home"> | <img src="docs/screenshots/06-tenant-payments.png" width="170" alt="Payments"> | <img src="docs/screenshots/07-tenant-bill.png" width="170" alt="Bill details"> | <img src="docs/screenshots/08-tenant-profile.png" width="170" alt="Tenant profile"> |
-| This month’s bill on an indigo card: still due (or paid), a bar of how much is covered (money in green, expenses taken off in amber), received and expenses of total, the room, and View bill. A red line for earlier months still unpaid, any advance held, a note on how to pay (cash, UPI or cheque to the landlord), all-time totals (“+ ₹… expenses taken off” in amber under Received) and the three latest bills. | Every bill, newest first, with Billed, Received (and any expenses taken off) and Still due, and All / Pending / Partial / Paid. Earlier months still unpaid say Overdue; a bill with an expense says so in amber. | One bill as the landlord’s bill sheet shows it, with each payment and expense, read-only. | Read-only, as on the web: photo, name, mobile, email, and the room and property from the newest bill. Change Password (the landlord’s screen and rules) and Log out. |
+| This month’s bill on an indigo card: still due (or paid), a bar of how much is covered (money in green, expenses taken off in amber), received and expenses of total, the room, and View bill. A red line for earlier months still unpaid, any advance held, a note on how to pay (cash, UPI or cheque to the landlord), all-time totals (“+ ₹… expenses taken off” in amber under Received) and the three latest bills. | Every bill, newest first, with Billed, Received (and any expenses taken off) and Still due, and All / Pending / Partial / Paid. Earlier months still unpaid say Overdue; a bill with an expense says so in amber. | One bill as the landlord’s bill sheet shows it, with each payment and expense, read-only, and Download bill (an image of the bill). | Read-only, as on the web: photo, name, mobile, email, and the room and property from the newest bill. Change Password (the landlord’s screen and rules) and Log out. |
 
 **Bill details** (replaces the Receipt) shows one bill as the landlord’s bill sheet does, without Collect, Edit or Delete: Total due, Received, Adjusted (when there are expenses) and Still due, and how much is paid or settled; then **Payments & deductions**, as on the web read-only: each payment with its method, number, date and note, and each expense in amber with its category and “paid by you”. Only their photos open (a PDF opens in the phone’s viewer). Then rent, electricity with the readings, other charges, advance used, the bill’s note, any advance kept for later bills, and the meter photo.
 

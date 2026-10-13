@@ -129,9 +129,12 @@ private fun ThemeButton() {
     }
 }
 
+/** A button at the end of the top bar's title row, such as Download; a spinner while [busy]. */
+data class TopBarAction(val icon: LucideIcon, val label: String, val busy: Boolean = false, val onClick: () -> Unit)
+
 /**
  * The web's phone top bar: menu, clock, notifications, theme and account on the first
- * row; a greeting (or back button and page title) and an optional chip below.
+ * row; a greeting (or back button and page title), an optional chip and [action] below.
  */
 @Composable
 fun RfTopBar(
@@ -144,7 +147,8 @@ fun RfTopBar(
     chip: String? = null,
     unread: Int = 0,
     onNotifications: (() -> Unit)? = null,
-    onProfile: (() -> Unit)? = null
+    onProfile: (() -> Unit)? = null,
+    action: TopBarAction? = null
 ) {
     Column(
         modifier
@@ -207,6 +211,12 @@ fun RfTopBar(
             )
             if (chip != null) {
                 Pill(chip, background = Rf.Low, content = Rf.Primary, style = RfType.LabelMd, horizontal = 12.dp, vertical = 6.dp, trailingIcon = Lucide.ChevronDown)
+            }
+            if (action != null) {
+                SquareButton(if (action.busy) null else action.onClick, size = 32, radius = 12) {
+                    if (action.busy) Spinner(Rf.Primary, size = 16.dp)
+                    else LIcon(action.icon, size = 18.dp, tint = Rf.Primary, contentDescription = action.label)
+                }
             }
         }
     }

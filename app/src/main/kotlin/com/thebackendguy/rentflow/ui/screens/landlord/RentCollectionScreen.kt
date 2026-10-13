@@ -54,6 +54,7 @@ import com.thebackendguy.rentflow.data.CollectionBills
 import com.thebackendguy.rentflow.data.Loadable
 import com.thebackendguy.rentflow.data.PaymentStore
 import com.thebackendguy.rentflow.data.Photo
+import com.thebackendguy.rentflow.data.session.SessionStore
 import com.thebackendguy.rentflow.data.SettledSplit
 import com.thebackendguy.rentflow.data.settledSplit
 import com.thebackendguy.rentflow.data.splitSettled
@@ -784,6 +785,7 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onEntry: (String) -
     var saving by remember { mutableStateOf<String?>(null) } // "photo" or "proof" while one uploads
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    val downloader = rememberBillDownloader()
     val total = bill.totalDue
     val settled = min(bill.settledByTenant + bill.creditApplied, total)
     val percent = if (total > 0) (settled / total * 100).roundToInt() else 100
@@ -860,6 +862,15 @@ internal fun BillSheet(bill: BillDto, onDismiss: () -> Unit, onEntry: (String) -
                             listOfNotNull(bill.tenant?.fullName, bill.room?.roomNumber?.let { "Room $it" }, bill.property?.propertyName).joinToString(" • "),
                             style = RfType.LabelSm.copy(fontWeight = FontWeight.Medium), color = Rf.OnSurfaceVariant
                         )
+                    }
+                    // The bill as an image, issued by the signed-in landlord
+                    Box(
+                        Modifier.size(32.dp).pressable(if (downloader.busy) null else ({ downloader.download(bill, SessionStore.session.value?.user) }))
+                            .clip(RoundedCornerShape(10.dp)).background(Rf.PrimaryFixed),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (downloader.busy) Spinner(Rf.Primary, size = 14.dp)
+                        else LIcon(Lucide.Download, size = 16.dp, tint = Rf.Primary, contentDescription = "Download the bill")
                     }
                     Box(Modifier.size(32.dp).pressable(onDismiss).clip(RoundedCornerShape(10.dp)).background(Rf.Low), contentAlignment = Alignment.Center) {
                         LIcon(Lucide.X, size = 16.dp, tint = Rf.OnSurfaceVariant, contentDescription = "Close")

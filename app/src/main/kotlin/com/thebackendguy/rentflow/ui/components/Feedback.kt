@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -55,7 +56,9 @@ fun FloatingNotice(
     isError: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    key: Any? = message
+    key: Any? = message,
+    detail: String? = null,
+    actions: List<ToastAction> = emptyList()
 ) {
     val dismiss by rememberUpdatedState(onDismiss)
     // Keeps the text and colour on screen while the note slides away after message turns null
@@ -63,11 +66,14 @@ fun FloatingNotice(
     if (message != null) {
         last.text = message
         last.error = isError
+        last.detail = detail
+        last.actions = actions
     }
 
     LaunchedEffect(key, message != null) {
         if (message != null) {
-            delay(4_500)
+            // A note with buttons stays longer, so there is time to tap one
+            delay(if (actions.isEmpty()) 4_500 else 8_000)
             dismiss()
         }
     }
@@ -94,17 +100,40 @@ fun FloatingNotice(
         ) {
             if (error) LIcon(Lucide.TriangleAlert, size = 20.dp, tint = Rf.Error)
             else LIcon(Lucide.CircleCheck, size = 20.dp, tint = Rf.Mint)
-            Text(
-                text = last.text,
-                style = RfType.BodySm.copy(fontWeight = FontWeight.SemiBold),
-                color = if (error) Rf.OnErrorContainer else Color.White,
-                modifier = Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = last.text,
+                    style = RfType.BodySm.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (error) Rf.OnErrorContainer else Color.White
+                )
+                last.detail?.let {
+                    Text(it, style = RfType.LabelSm, color = if (error) Rf.OnErrorContainer else Color.White.copy(alpha = 0.7f))
+                }
+            }
+            last.actions.forEach { action ->
+                Text(
+                    action.label,
+                    style = RfType.LabelMd.copy(fontWeight = FontWeight.ExtraBold),
+                    color = if (error) Rf.Error else Color(0xFFA5B4FC),
+                    modifier = Modifier.pressable({
+                        action.onClick()
+                        dismiss()
+                    }).padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+            }
         }
     }
 }
 
-private class Shown(var text: String = "", var error: Boolean = true)
+private class Shown(
+    var text: String = "",
+    var error: Boolean = true,
+    var detail: String? = null,
+    var actions: List<ToastAction> = emptyList()
+)
+
+/** A button on a note, such as "Open" on "Bill saved as image". */
+data class ToastAction(val label: String, val onClick: () -> Unit)
 
 /** The red version, for the sign-in screens. */
 @Composable
@@ -114,13 +143,20 @@ fun FloatingError(message: String?, onDismiss: () -> Unit, modifier: Modifier = 
 
 /** App-wide short messages, such as "Property saved", shown by [ToastHost]. */
 object Toasts {
-    data class Toast(val text: String, val isError: Boolean, val id: Long = System.nanoTime())
+    data class Toast(
+        val text: String,
+        val isError: Boolean,
+        val detail: String? = null,
+        val actions: List<ToastAction> = emptyList(),
+        val id: Long = System.nanoTime()
+    )
 
     private val _current = MutableStateFlow<Toast?>(null)
     val current: StateFlow<Toast?> = _current
 
-    fun show(text: String) {
-        _current.value = Toast(text, isError = false)
+    /** [detail] is a smaller second line; [actions] are buttons on the note. */
+    fun show(text: String, detail: String? = null, actions: List<ToastAction> = emptyList()) {
+        _current.value = Toast(text, isError = false, detail = detail, actions = actions)
     }
 
     fun error(text: String) {
@@ -140,6 +176,8 @@ fun ToastHost(modifier: Modifier = Modifier) {
         isError = toast?.isError ?: false,
         onDismiss = { toast?.let { Toasts.dismiss(it.id) } },
         modifier = modifier,
-        key = toast?.id
+        key = toast?.id,
+        detail = toast?.detail,
+        actions = toast?.actions.orEmpty()
     )
 }

@@ -19,6 +19,7 @@ import com.thebackendguy.rentflow.ui.components.RfBottomNav
 import com.thebackendguy.rentflow.ui.components.RfCard
 import com.thebackendguy.rentflow.ui.components.RfTopBar
 import com.thebackendguy.rentflow.ui.components.TonalButton
+import com.thebackendguy.rentflow.ui.components.TopBarAction
 import com.thebackendguy.rentflow.ui.icons.LIcon
 import com.thebackendguy.rentflow.ui.icons.Lucide
 import com.thebackendguy.rentflow.ui.theme.Rf
@@ -63,7 +64,7 @@ class Shell(
     private val onTab: (Int) -> Unit
 ) {
     @Composable
-    fun TopBar(title: String, onBack: (() -> Unit)? = null, chip: String? = null) {
+    fun TopBar(title: String, onBack: (() -> Unit)? = null, chip: String? = null, action: TopBarAction? = null) {
         var showNotifications by remember { mutableStateOf(false) }
         RfTopBar(
             title = title,
@@ -74,7 +75,8 @@ class Shell(
             chip = chip,
             unread = unread,
             onNotifications = { showNotifications = true },
-            onProfile = onProfile
+            onProfile = onProfile,
+            action = action
         )
         if (showNotifications) NotificationsSheet(role, onDismiss = { showNotifications = false })
     }
